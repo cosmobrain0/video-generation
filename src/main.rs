@@ -1,15 +1,21 @@
 use image::RgbaImage;
-use std::borrow::Cow;
+use std::{borrow::Cow, time::Instant};
 use wgpu::util::DeviceExt;
 
 async fn run() {
-    let (width, height) = (20, 20);
+    let (width, height) = (720, 720);
 
     let pixel_data = execute_gpu(width, height).await.unwrap();
 
+    let start = Instant::now();
     let image = RgbaImage::from_raw(width, height, pixel_data).expect("Failed to create image!");
 
     image.save("test.bmp").expect("Failed to save image!");
+    let end = Instant::now();
+    println!(
+        "Generating and saving the image took: {time}",
+        time = end.duration_since(start).as_secs_f64()
+    );
 }
 
 async fn execute_gpu(width: u32, height: u32) -> Option<Vec<u8>> {
@@ -36,7 +42,14 @@ async fn execute_gpu(width: u32, height: u32) -> Option<Vec<u8>> {
         .await
         .unwrap();
 
-    execute_gpu_inner(&device, &queue, width, height).await
+    let start = Instant::now();
+    let result = execute_gpu_inner(&device, &queue, width, height).await;
+    let end = Instant::now();
+    println!(
+        "Processing took: {time}",
+        time = end.duration_since(start).as_secs_f64()
+    );
+    result
 }
 
 async fn execute_gpu_inner(
@@ -80,7 +93,14 @@ async fn execute_gpu_inner(
     });
     let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Uniform Buffer"),
-        contents: bytemuck::cast_slice(&[0xFF0000FF, width]),
+        contents: bytemuck::cast_slice(&[
+            bytemuck::cast::<_, u32>(720f32 / 2f32),
+            bytemuck::cast(720f32 / 2f32),
+            bytemuck::cast(300f32),
+            width,
+            0xC0C0C0FF,
+            0,
+        ]),
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     });
 
@@ -129,7 +149,7 @@ async fn execute_gpu_inner(
         cpass.set_pipeline(&compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.insert_debug_marker("compute collatz iterations");
-        cpass.dispatch_workgroups(width * height, 1, 1); // Number of cells to run, the (x,y,z) size of item being processed
+        cpass.dispatch_workgroups(width, height, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
     // Sets adds copy operation to command encoder.
     // Will copy data from storage buffer on GPU to staging buffer on CPU.
