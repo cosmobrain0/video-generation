@@ -1,21 +1,11 @@
-use std::{borrow::Cow, mem::size_of_val, str::FromStr};
+use std::{borrow::Cow, mem::size_of_val};
 use wgpu::util::DeviceExt;
 
 // Indicates a u32 overflow in an intermediate Collatz value
 const OVERFLOW: u32 = 0xffffffff;
 
-#[cfg_attr(test, allow(dead_code))]
 async fn run() {
-    let numbers = if std::env::args().len() <= 2 {
-        let default = vec![1, 2, 3, 4];
-        println!("No numbers were provided, defaulting to {default:?}");
-        default
-    } else {
-        std::env::args()
-            .skip(2)
-            .map(|s| u32::from_str(&s).expect("You must pass a list of positive integers!"))
-            .collect()
-    };
+    let numbers = vec![1, 2, 3, 4];
 
     let steps = execute_gpu(&numbers).await.unwrap();
 
@@ -28,8 +18,6 @@ async fn run() {
         .collect();
 
     println!("Steps: [{}]", disp_steps.join(", "));
-    #[cfg(target_arch = "wasm32")]
-    log::info!("Steps: [{}]", disp_steps.join(", "));
 }
 
 #[cfg_attr(test, allow(dead_code))]
