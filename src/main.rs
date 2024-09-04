@@ -1,26 +1,18 @@
-use std::{borrow::Cow, mem::size_of_val};
+use image::RgbaImage;
+use std::borrow::Cow;
 use wgpu::util::DeviceExt;
 
-// Indicates a u32 overflow in an intermediate Collatz value
-const OVERFLOW: u32 = 0xffffffff;
-
 async fn run() {
-    let numbers = vec![1, 2, 3, 4];
+    let (width, height) = (20, 20);
 
-    let steps = execute_gpu(&numbers).await.unwrap();
+    let pixel_data = execute_gpu(width, height).await.unwrap();
 
-    let disp_steps: Vec<String> = steps
-        .iter()
-        .map(|&n| match n {
-            OVERFLOW => "OVERFLOW".to_string(),
-            _ => n.to_string(),
-        })
-        .collect();
+    let image = RgbaImage::from_raw(width, height, pixel_data).expect("Failed to create image!");
 
-    println!("Steps: [{}]", disp_steps.join(", "));
+    image.save("test.bmp").expect("Failed to save image!");
 }
 
-async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
+async fn execute_gpu(width: u32, height: u32) -> Option<Vec<u8>> {
     // Instantiates instance of WebGPU
     let instance = wgpu::Instance::default();
 
@@ -44,14 +36,15 @@ async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
         .await
         .unwrap();
 
-    execute_gpu_inner(&device, &queue, numbers).await
+    execute_gpu_inner(&device, &queue, width, height).await
 }
 
 async fn execute_gpu_inner(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    numbers: &[u32],
-) -> Option<Vec<u32>> {
+    width: u32,
+    height: u32,
+) -> Option<Vec<u8>> {
     // Loads the shader from WGSL
     let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
@@ -59,7 +52,8 @@ async fn execute_gpu_inner(
     });
 
     // Gets the size in bytes of the buffer.
-    let size = size_of_val(numbers) as wgpu::BufferAddress;
+    let size = (std::mem::size_of::<u8>() as u32 * width * height * 4) as wgpu::BufferAddress;
+    let buffer_content_slice: Vec<u8> = (0..width * height * 4).map(|_| 0).collect();
 
     // Instantiates buffer without data.
     // `usage` of buffer specifies how it can be used:
@@ -79,14 +73,14 @@ async fn execute_gpu_inner(
     //   The source of a copy.
     let output_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Output Buffer"),
-        contents: bytemuck::cast_slice(numbers),
+        contents: &buffer_content_slice,
         usage: wgpu::BufferUsages::STORAGE
             | wgpu::BufferUsages::COPY_DST
             | wgpu::BufferUsages::COPY_SRC,
     });
     let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Uniform Buffer"),
-        contents: bytemuck::cast_slice(&[5]),
+        contents: bytemuck::cast_slice(&[0xFF0000FF, width]),
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     });
 
@@ -135,7 +129,7 @@ async fn execute_gpu_inner(
         cpass.set_pipeline(&compute_pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.insert_debug_marker("compute collatz iterations");
-        cpass.dispatch_workgroups(numbers.len() as u32, 1, 1); // Number of cells to run, the (x,y,z) size of item being processed
+        cpass.dispatch_workgroups(width * height, 1, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
     // Sets adds copy operation to command encoder.
     // Will copy data from storage buffer on GPU to staging buffer on CPU.
