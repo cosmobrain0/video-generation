@@ -20,7 +20,6 @@ async fn run() {
     println!("Steps: [{}]", disp_steps.join(", "));
 }
 
-#[cfg_attr(test, allow(dead_code))]
 async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
     // Instantiates instance of WebGPU
     let instance = wgpu::Instance::default();
@@ -83,6 +82,13 @@ async fn execute_gpu_inner(
         contents: bytemuck::cast_slice(numbers),
         usage: wgpu::BufferUsages::STORAGE
             | wgpu::BufferUsages::COPY_DST
+            | wgpu::BufferUsages::COPY_SRC, // TODO: try removing this
+    });
+    let output_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Output Buffer"),
+        contents: bytemuck::cast_slice(&[0u8; 10]),
+        usage: wgpu::BufferUsages::STORAGE
+            | wgpu::BufferUsages::COPY_DST
             | wgpu::BufferUsages::COPY_SRC,
     });
 
@@ -107,10 +113,16 @@ async fn execute_gpu_inner(
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout: &bind_group_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: storage_buffer.as_entire_binding(),
-        }],
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: storage_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: output_buffer.as_entire_binding(),
+            },
+        ],
     });
 
     // A command encoder executes one or many pipelines.
