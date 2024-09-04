@@ -86,10 +86,15 @@ async fn execute_gpu_inner(
     });
     let output_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Output Buffer"),
-        contents: bytemuck::cast_slice(&[0u8; 10]),
+        contents: bytemuck::cast_slice(numbers),
         usage: wgpu::BufferUsages::STORAGE
             | wgpu::BufferUsages::COPY_DST
             | wgpu::BufferUsages::COPY_SRC,
+    });
+    let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Uniform Buffer"),
+        contents: bytemuck::cast_slice(&[5]),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     });
 
     // A bind group defines how buffers are accessed by shaders.
@@ -122,6 +127,10 @@ async fn execute_gpu_inner(
                 binding: 1,
                 resource: output_buffer.as_entire_binding(),
             },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: uniform_buffer.as_entire_binding(),
+            },
         ],
     });
 
@@ -141,7 +150,7 @@ async fn execute_gpu_inner(
     }
     // Sets adds copy operation to command encoder.
     // Will copy data from storage buffer on GPU to staging buffer on CPU.
-    encoder.copy_buffer_to_buffer(&storage_buffer, 0, &staging_buffer, 0, size);
+    encoder.copy_buffer_to_buffer(&output_buffer, 0, &staging_buffer, 0, size);
 
     // Submits command encoder for processing
     queue.submit(Some(encoder.finish()));
