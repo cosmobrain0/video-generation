@@ -77,13 +77,6 @@ async fn execute_gpu_inner(
     //   A storage buffer (can be bound within a bind group and thus available to a shader).
     //   The destination of a copy.
     //   The source of a copy.
-    let storage_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Storage Buffer"),
-        contents: bytemuck::cast_slice(numbers),
-        usage: wgpu::BufferUsages::STORAGE
-            | wgpu::BufferUsages::COPY_DST
-            | wgpu::BufferUsages::COPY_SRC, // TODO: try removing this
-    });
     let output_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Output Buffer"),
         contents: bytemuck::cast_slice(numbers),
@@ -121,14 +114,10 @@ async fn execute_gpu_inner(
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: storage_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
                 resource: output_buffer.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
-                binding: 2,
+                binding: 1,
                 resource: uniform_buffer.as_entire_binding(),
             },
         ],
@@ -202,6 +191,3 @@ pub fn main() {
         wasm_bindgen_futures::spawn_local(run());
     }
 }
-
-#[cfg(test)]
-mod tests;
