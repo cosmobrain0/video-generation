@@ -3,7 +3,7 @@ mod shapes;
 use image::RgbaImage;
 use shapes::*;
 use std::{borrow::Cow, time::Instant};
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, ShaderModule};
 
 async fn run() {
     let (width, height) = (720, 720);
@@ -25,8 +25,20 @@ async fn run() {
         )
         .await
         .unwrap();
+    let circle_cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
+    });
+
     let start = Instant::now();
-    let pixel_data = execute_gpu(&device, &queue, width, height).await.unwrap();
+    let circles = vec![
+        Circle::new((720.0 / 2.0, 720.0 / 2.0), 300.0, 0xC0C0C0FF),
+        Circle::new((100.0, 200.0), 80.0, 0xFFFFFFFF),
+    ];
+
+    let pixel_data = execute_gpu(&device, &queue, width, height, circles, circle_cs_module)
+        .await
+        .unwrap();
     let end = Instant::now();
     println!(
         "Processing took: {time}",
@@ -49,16 +61,13 @@ async fn execute_gpu(
     queue: &wgpu::Queue,
     width: u32,
     height: u32,
+    circles: Vec<Circle>,
+    circle_cs_module: ShaderModule,
 ) -> Option<Vec<u8>> {
-    // Loads the shader from WGSL
-    let circle_cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
-    });
-    let rect_cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader-rect.wgsl"))),
-    });
+    // let rect_cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+    //     label: None,
+    //     source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader-rect.wgsl"))),
+    // });
 
     // Gets the size in bytes of the buffer.
     let size = (std::mem::size_of::<u8>() as u32 * width * height * 4) as wgpu::BufferAddress;
@@ -87,11 +96,6 @@ async fn execute_gpu(
             | wgpu::BufferUsages::COPY_SRC,
         mapped_at_creation: false,
     });
-    let circles = [
-        Circle::new((720.0 / 2.0, 720.0 / 2.0), 300.0, 0xC0C0C0FF),
-        Circle::new((100.0, 200.0), 80.0, 0xFFFFFFFF),
-    ];
-
     // let uniform_buffer_first_rect = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
     //     label: Some("First Rectangle Uniform Buffer"),
     //     contents: bytemuck::cast_slice(&[
