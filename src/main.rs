@@ -1,34 +1,18 @@
+mod shapes;
+
 use image::RgbaImage;
+use shapes::*;
 use std::{borrow::Cow, time::Instant};
 use wgpu::util::DeviceExt;
 
 async fn run() {
     let (width, height) = (720, 720);
 
-    let pixel_data = execute_gpu(width, height).await.unwrap();
-
-    let start = Instant::now();
-    let image = RgbaImage::from_raw(width, height, pixel_data).expect("Failed to create image!");
-
-    image.save("test.bmp").expect("Failed to save image!");
-    let end = Instant::now();
-    println!(
-        "Generating and saving the image took: {time}",
-        time = end.duration_since(start).as_secs_f64()
-    );
-}
-
-async fn execute_gpu(width: u32, height: u32) -> Option<Vec<u8>> {
-    // Instantiates instance of WebGPU
     let instance = wgpu::Instance::default();
-
-    // `request_adapter` instantiates the general connection to the GPU
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions::default())
-        .await?;
-
-    // `request_device` instantiates the feature specific connection to the GPU, defining some parameters,
-    //  `features` being the available features.
+        .await
+        .unwrap();
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
@@ -41,18 +25,26 @@ async fn execute_gpu(width: u32, height: u32) -> Option<Vec<u8>> {
         )
         .await
         .unwrap();
-
     let start = Instant::now();
-    let result = execute_gpu_inner(&device, &queue, width, height).await;
+    let pixel_data = execute_gpu(&device, &queue, width, height).await.unwrap();
     let end = Instant::now();
     println!(
         "Processing took: {time}",
         time = end.duration_since(start).as_secs_f64()
     );
-    result
+
+    let start = Instant::now();
+    let image = RgbaImage::from_raw(width, height, pixel_data).expect("Failed to create image!");
+
+    image.save("test.bmp").expect("Failed to save image!");
+    let end = Instant::now();
+    println!(
+        "Generating and saving the image took: {time}",
+        time = end.duration_since(start).as_secs_f64()
+    );
 }
 
-async fn execute_gpu_inner(
+async fn execute_gpu(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     width: u32,
@@ -95,58 +87,37 @@ async fn execute_gpu_inner(
             | wgpu::BufferUsages::COPY_SRC,
         mapped_at_creation: false,
     });
-    let uniform_buffer_first_circle =
-        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[
-                bytemuck::cast::<_, u32>(720f32 / 2f32),
-                bytemuck::cast(720f32 / 2f32),
-                bytemuck::cast(300f32),
-                width,
-                0xC0C0C0FF,
-                0,
-            ]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-    let uniform_buffer_second_circle =
-        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Second Circle Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[
-                bytemuck::cast::<_, u32>(100f32),
-                bytemuck::cast(200f32),
-                bytemuck::cast(80f32),
-                width,
-                0xFFFFFFFF,
-                0,
-            ]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-    let uniform_buffer_first_rect = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("First Rectangle Uniform Buffer"),
-        contents: bytemuck::cast_slice(&[
-            bytemuck::cast::<_, u32>(100f32),
-            bytemuck::cast(200f32),
-            bytemuck::cast(80f32),
-            bytemuck::cast(30f32),
-            width,
-            0x00FF00FF,
-            0,
-        ]),
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-    });
-    let uniform_buffer_second_rect = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("First Rectangle Uniform Buffer"),
-        contents: bytemuck::cast_slice(&[
-            bytemuck::cast::<_, u32>(300f32),
-            bytemuck::cast(200f32),
-            bytemuck::cast(50f32),
-            bytemuck::cast(50f32),
-            width,
-            0xFFFF00FF,
-            0,
-        ]),
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-    });
+    let circles = [
+        Circle::new((720.0 / 2.0, 720.0 / 2.0), 300.0, 0xC0C0C0FF),
+        Circle::new((100.0, 200.0), 80.0, 0xFFFFFFFF),
+    ];
+
+    // let uniform_buffer_first_rect = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //     label: Some("First Rectangle Uniform Buffer"),
+    //     contents: bytemuck::cast_slice(&[
+    //         bytemuck::cast::<_, u32>(100f32),
+    //         bytemuck::cast(200f32),
+    //         bytemuck::cast(80f32),
+    //         bytemuck::cast(30f32),
+    //         width,
+    //         0x00FF00FF,
+    //         0,
+    //     ]),
+    //     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    // });
+    // let uniform_buffer_second_rect = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //     label: Some("First Rectangle Uniform Buffer"),
+    //     contents: bytemuck::cast_slice(&[
+    //         bytemuck::cast::<_, u32>(300f32),
+    //         bytemuck::cast(200f32),
+    //         bytemuck::cast(50f32),
+    //         bytemuck::cast(50f32),
+    //         width,
+    //         0xFFFF00FF,
+    //         0,
+    //     ]),
+    //     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    // });
 
     // A bind group defines how buffers are accessed by shaders.
     // It is to WebGPU what a descriptor set is to Vulkan.
@@ -165,79 +136,68 @@ async fn execute_gpu_inner(
             cache: None,
         });
 
-    let rect_compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-        label: None,
-        layout: None,
-        module: &rect_cs_module,
-        entry_point: "main",
-        compilation_options: Default::default(),
-        cache: None,
-    });
+    // let rect_compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+    //     label: None,
+    //     layout: None,
+    //     module: &rect_cs_module,
+    //     entry_point: "main",
+    //     compilation_options: Default::default(),
+    //     cache: None,
+    // });
 
     // Instantiates the bind group, once again specifying the binding of buffers.
     let circle_bind_group_layout = circle_compute_pipeline.get_bind_group_layout(0);
-    let circle_bind_groups = [
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &circle_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: output_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: uniform_buffer_first_circle.as_entire_binding(),
-                },
-            ],
-        }),
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &circle_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: output_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: uniform_buffer_second_circle.as_entire_binding(),
-                },
-            ],
-        }),
-    ];
+    let circle_bind_groups: Vec<_> = circles
+        .iter()
+        .map(|c| {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &circle_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: output_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: c.create_buffer(device, width, height).as_entire_binding(),
+                    },
+                ],
+            })
+        })
+        .collect();
 
-    let rect_bind_group_layout = rect_compute_pipeline.get_bind_group_layout(0);
-    let rect_bind_groups = [
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &rect_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: output_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: uniform_buffer_first_rect.as_entire_binding(),
-                },
-            ],
-        }),
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &rect_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: output_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: uniform_buffer_second_rect.as_entire_binding(),
-                },
-            ],
-        }),
-    ];
+    // let rect_bind_group_layout = rect_compute_pipeline.get_bind_group_layout(0);
+    // let rect_bind_groups = [
+    //     device.create_bind_group(&wgpu::BindGroupDescriptor {
+    //         label: None,
+    //         layout: &rect_bind_group_layout,
+    //         entries: &[
+    //             wgpu::BindGroupEntry {
+    //                 binding: 0,
+    //                 resource: output_buffer.as_entire_binding(),
+    //             },
+    //             wgpu::BindGroupEntry {
+    //                 binding: 1,
+    //                 resource: uniform_buffer_first_rect.as_entire_binding(),
+    //             },
+    //         ],
+    //     }),
+    //     device.create_bind_group(&wgpu::BindGroupDescriptor {
+    //         label: None,
+    //         layout: &rect_bind_group_layout,
+    //         entries: &[
+    //             wgpu::BindGroupEntry {
+    //                 binding: 0,
+    //                 resource: output_buffer.as_entire_binding(),
+    //             },
+    //             wgpu::BindGroupEntry {
+    //                 binding: 1,
+    //                 resource: uniform_buffer_second_rect.as_entire_binding(),
+    //             },
+    //         ],
+    //     }),
+    // ];
 
     // A command encoder executes one or many pipelines.
     // It is to WebGPU what a command buffer is to Vulkan.
@@ -249,41 +209,33 @@ async fn execute_gpu_inner(
             timestamp_writes: None,
         });
 
-        let mut draw_circle = |circle_compute_pipeline, circle_bind_group, debug_name| {
+        let mut draw_circle = |circle_compute_pipeline, circle_bind_group| {
             cpass.set_pipeline(circle_compute_pipeline);
             cpass.set_bind_group(0, circle_bind_group, &[]);
-            cpass.insert_debug_marker(debug_name);
             cpass.dispatch_workgroups(width, height, 1);
         };
 
-        draw_circle(
-            &circle_compute_pipeline,
-            &circle_bind_groups[0],
-            "First Circle Render",
-        );
-        draw_circle(
-            &circle_compute_pipeline,
-            &circle_bind_groups[1],
-            "Second Circle Render",
-        );
+        for bind_group in &circle_bind_groups {
+            draw_circle(&circle_compute_pipeline, bind_group);
+        }
 
-        let mut draw_rect = |rect_compute_pipeline, rect_bind_group, debug_name| {
-            cpass.set_pipeline(rect_compute_pipeline);
-            cpass.set_bind_group(0, rect_bind_group, &[]);
-            cpass.insert_debug_marker(debug_name);
-            cpass.dispatch_workgroups(width, height, 1);
-        };
+        // let mut draw_rect = |rect_compute_pipeline, rect_bind_group, debug_name| {
+        //     cpass.set_pipeline(rect_compute_pipeline);
+        //     cpass.set_bind_group(0, rect_bind_group, &[]);
+        //     cpass.insert_debug_marker(debug_name);
+        //     cpass.dispatch_workgroups(width, height, 1);
+        // };
 
-        draw_rect(
-            &rect_compute_pipeline,
-            &rect_bind_groups[0],
-            "First Rectangle Render",
-        );
-        draw_rect(
-            &rect_compute_pipeline,
-            &rect_bind_groups[1],
-            "Second Rectangle Render",
-        );
+        // draw_rect(
+        //     &rect_compute_pipeline,
+        //     &rect_bind_groups[0],
+        //     "First Rectangle Render",
+        // );
+        // draw_rect(
+        //     &rect_compute_pipeline,
+        //     &rect_bind_groups[1],
+        //     "Second Rectangle Render",
+        // );
     }
     // Sets adds copy operation to command encoder.
     // Will copy data from storage buffer on GPU to staging buffer on CPU.
