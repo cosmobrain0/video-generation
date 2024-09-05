@@ -25,7 +25,4 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     if (offset.x*offset.x + offset.y*offset.y <= uniforms.radius*uniforms.radius) {
         v_indices_output[id] = uniforms.colour;
     }
-    else {
-        v_indices_output[id] = 0u;
-    }
 }

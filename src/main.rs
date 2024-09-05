@@ -66,7 +66,6 @@ async fn execute_gpu_inner(
 
     // Gets the size in bytes of the buffer.
     let size = (std::mem::size_of::<u8>() as u32 * width * height * 4) as wgpu::BufferAddress;
-    let buffer_content_slice: Vec<u8> = (0..width * height * 4).map(|_| 0).collect();
 
     // Instantiates buffer without data.
     // `usage` of buffer specifies how it can be used:
@@ -84,25 +83,40 @@ async fn execute_gpu_inner(
     //   A storage buffer (can be bound within a bind group and thus available to a shader).
     //   The destination of a copy.
     //   The source of a copy.
-    let output_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Output Buffer"),
-        contents: &buffer_content_slice,
+        size,
         usage: wgpu::BufferUsages::STORAGE
             | wgpu::BufferUsages::COPY_DST
             | wgpu::BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
     });
-    let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Uniform Buffer"),
-        contents: bytemuck::cast_slice(&[
-            bytemuck::cast::<_, u32>(720f32 / 2f32),
-            bytemuck::cast(720f32 / 2f32),
-            bytemuck::cast(300f32),
-            width,
-            0xC0C0C0FF,
-            0,
-        ]),
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-    });
+    let uniform_buffer_first_circle =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[
+                bytemuck::cast::<_, u32>(720f32 / 2f32),
+                bytemuck::cast(720f32 / 2f32),
+                bytemuck::cast(300f32),
+                width,
+                0xC0C0C0FF,
+                0,
+            ]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+    let uniform_buffer_second_circle =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Second Circle Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[
+                bytemuck::cast::<_, u32>(100f32),
+                bytemuck::cast(200f32),
+                bytemuck::cast(80f32),
+                width,
+                0xFFFFFFFF,
+                0,
+            ]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
     // A bind group defines how buffers are accessed by shaders.
     // It is to WebGPU what a descriptor set is to Vulkan.
@@ -122,20 +136,36 @@ async fn execute_gpu_inner(
 
     // Instantiates the bind group, once again specifying the binding of buffers.
     let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout: &bind_group_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: output_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: uniform_buffer.as_entire_binding(),
-            },
-        ],
-    });
+    let bind_groups = [
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: output_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: uniform_buffer_first_circle.as_entire_binding(),
+                },
+            ],
+        }),
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: output_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: uniform_buffer_second_circle.as_entire_binding(),
+                },
+            ],
+        }),
+    ];
 
     // A command encoder executes one or many pipelines.
     // It is to WebGPU what a command buffer is to Vulkan.
@@ -147,8 +177,11 @@ async fn execute_gpu_inner(
             timestamp_writes: None,
         });
         cpass.set_pipeline(&compute_pipeline);
-        cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.insert_debug_marker("compute collatz iterations");
+        cpass.set_bind_group(0, &bind_groups[0], &[]);
+        cpass.insert_debug_marker("First Circle Render");
+        cpass.dispatch_workgroups(width, height, 1); // Number of cells to run, the (x,y,z) size of item being processed
+        cpass.set_bind_group(0, &bind_groups[1], &[]);
+        cpass.insert_debug_marker("Second Circle Render");
         cpass.dispatch_workgroups(width, height, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
     // Sets adds copy operation to command encoder.
