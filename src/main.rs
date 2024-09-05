@@ -16,24 +16,32 @@ async fn run() {
 
     let format_name = |i| format!("output/test-{i}.bmp");
 
+    let clamp = |x: f32, min, max| x.min(max).max(min);
+    let clamp01 = |x| clamp(x, 0.0, 1.0);
+    let smoothstep = |x| x * x * (3.0 - 2.0 * x);
+    let inverse_lerp = |x, min, max| (x - min) / (max - min);
+
+    println!("Starting...");
     let start = Instant::now();
-    let target_radius = 300.0;
-    let frames: Vec<_> = (0..60)
-        .map(|i| i as f32)
-        .map(|i| i / 60.0)
-        .map(|percentage| percentage * percentage * (3.0 - 2.0 * percentage))
-        .map(|percentage| percentage * target_radius)
-        .map(|radius| vec![Circle::new_shape((360.0, 360.0), radius, 0xFFFFFFFF)])
-        .collect();
+    let mut frames = Vec::with_capacity(120);
+    let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
+
+    for i in 0..120 {
+        let radius = smoothstep(clamp01(inverse_lerp(i as f32, 0.0, 60.0))) * 300.0;
+        let height = smoothstep(clamp01(inverse_lerp(i as f32, 30.0, 90.0))) * 60.0;
+        let y = smoothstep(clamp01(inverse_lerp(i as f32, 45.0, 105.0))) * 360.0;
+        save_frame(&vec![
+            Circle::new_shape((720.0 / 2.0, 720.0 / 2.0), radius, 0xFFFFFF),
+            Rectangle::new_shape(
+                (720.0 / 2.0 - 150.0, y - height / 2.0),
+                (300.0, height),
+                0xFF0000FF,
+            ),
+        ]);
+    }
+
     let count = frames.len();
     render_and_save_frames(&gpu_instance, frames, 0, format_name).await;
-
-    let concat_file = (0..60)
-        .map(|i| format_name(i))
-        .map(|name| format!("file '{name}'"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    std::fs::write("./concat.txt", concat_file).expect("Failed to output concat file!");
 
     let end = Instant::now();
     println!(

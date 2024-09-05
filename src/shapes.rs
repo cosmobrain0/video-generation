@@ -2,6 +2,7 @@ use std::{borrow::Cow, path::Path};
 
 use wgpu::{util::DeviceExt as _, Adapter, Buffer, ComputePipeline, Device, Queue};
 
+#[derive(Debug, Clone)]
 pub struct Circle {
     pub position: (f32, f32),
     pub radius: f32,
@@ -40,6 +41,7 @@ impl Circle {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Rectangle {
     pub position: (f32, f32),
     pub size: (f32, f32),
@@ -156,6 +158,7 @@ impl GpuInstance {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Shape {
     Circle(Circle),
     Rectangle(Rectangle),
