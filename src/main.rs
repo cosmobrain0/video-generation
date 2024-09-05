@@ -14,34 +14,60 @@ async fn run() {
     )
     .await;
 
-    let start = Instant::now();
-    let shapes = vec![
-        Circle::new_shape((720.0 / 2.0, 720.0 / 2.0), 300.0, 0xFFC0C0C0),
-        Circle::new_shape((100.0, 200.0), 80.0, 0xFFFFFFFF),
-        Rectangle::new_shape((240.0, 40.0), (80.0, 150.0), 0xFF0000FF),
-        Rectangle::new_shape((30.0, 30.0), (200.0, 50.0), 0xFF7FFF00),
-    ];
-
-    let pixel_data = execute_gpu(&gpu_instance, shapes).await.unwrap();
-    let end = Instant::now();
-    println!(
-        "Processing took: {time}",
-        time = end.duration_since(start).as_secs_f64()
-    );
+    let format_name = |i| format!("output/test-{i}.bmp");
 
     let start = Instant::now();
-    let image = RgbaImage::from_raw(gpu_instance.width, gpu_instance.height, pixel_data)
-        .expect("Failed to create image!");
+    let target_radius = 300.0;
+    let frames: Vec<_> = (0..60)
+        .map(|i| i as f32)
+        .map(|i| i / 60.0)
+        .map(|percentage| percentage * percentage * (3.0 - 2.0 * percentage))
+        .map(|percentage| percentage * target_radius)
+        .map(|radius| vec![Circle::new_shape((360.0, 360.0), radius, 0xFFFFFFFF)])
+        .collect();
+    let count = frames.len();
+    render_and_save_frames(&gpu_instance, frames, 0, format_name).await;
 
-    image.save("test.bmp").expect("Failed to save image!");
+    let concat_file = (0..60)
+        .map(|i| format_name(i))
+        .map(|name| format!("file '{name}'"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write("./concat.txt", concat_file).expect("Failed to output concat file!");
+
     let end = Instant::now();
     println!(
-        "Generating and saving the image took: {time}",
-        time = end.duration_since(start).as_secs_f64()
+        "Time taken for {count} frames is {total_duration}ms - {fps}FPS!",
+        total_duration = end.duration_since(start).as_secs_f64(),
+        fps = count as f64 / end.duration_since(start).as_secs_f64()
     );
 }
 
-async fn execute_gpu(gpu_instance: &GpuInstance, shapes: Vec<Shape>) -> Option<Vec<u8>> {
+async fn render_and_save_frames(
+    gpu_instance: &GpuInstance,
+    frames: Vec<Vec<Shape>>,
+    start_index: usize,
+    format_name: impl Fn(usize) -> String,
+) {
+    for (i, frame) in frames
+        .into_iter()
+        .enumerate()
+        .map(|(i, x)| (i + start_index, x))
+    {
+        render_and_save_frame(gpu_instance, frame, format_name(i).as_str()).await;
+    }
+}
+
+async fn render_and_save_frame(gpu_instance: &GpuInstance, shapes: Vec<Shape>, name: &str) {
+    let pixel_data = render_frame(&gpu_instance, shapes).await.unwrap();
+
+    let image = RgbaImage::from_raw(gpu_instance.width, gpu_instance.height, pixel_data)
+        .expect("Failed to create image!");
+
+    image.save(name).expect("Failed to save image!");
+}
+
+async fn render_frame(gpu_instance: &GpuInstance, shapes: Vec<Shape>) -> Option<Vec<u8>> {
     let (width, height, device, circle_compute_pipeline, rect_compute_pipeline) = (
         gpu_instance.width,
         gpu_instance.height,
