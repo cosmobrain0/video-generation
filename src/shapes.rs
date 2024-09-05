@@ -16,6 +16,14 @@ impl Circle {
         }
     }
 
+    pub fn new_shape(position: (f32, f32), radius: f32, colour: u32) -> Shape {
+        Shape::Circle(Self {
+            position,
+            radius,
+            colour,
+        })
+    }
+
     pub fn create_buffer(&self, device: &Device, width: u32, height: u32) -> Buffer {
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Circle Uniform Buffer"),
@@ -44,6 +52,14 @@ impl Rectangle {
             size,
             colour,
         }
+    }
+
+    pub fn new_shape(position: (f32, f32), size: (f32, f32), colour: u32) -> Shape {
+        Shape::Rectangle(Self {
+            position,
+            size,
+            colour,
+        })
     }
 
     pub fn create_buffer(&self, device: &Device, width: u32, height: u32) -> Buffer {
@@ -136,6 +152,19 @@ impl GpuInstance {
             queue,
             circle_compute_pipeline,
             rect_compute_pipeline,
+        }
+    }
+}
+
+pub enum Shape {
+    Circle(Circle),
+    Rectangle(Rectangle),
+}
+impl Shape {
+    pub fn create_buffer(&self, device: &Device, width: u32, height: u32) -> Buffer {
+        match self {
+            Shape::Circle(x) => x.create_buffer(device, width, height),
+            Shape::Rectangle(x) => x.create_buffer(device, width, height),
         }
     }
 }

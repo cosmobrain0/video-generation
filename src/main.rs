@@ -15,18 +15,14 @@ async fn run() {
     .await;
 
     let start = Instant::now();
-    let circles = vec![
-        Circle::new((720.0 / 2.0, 720.0 / 2.0), 300.0, 0xFFC0C0C0),
-        Circle::new((100.0, 200.0), 80.0, 0xFFFFFFFF),
-    ];
-    let rectangles = vec![
-        Rectangle::new((240.0, 40.0), (80.0, 150.0), 0xFF0000FF),
-        Rectangle::new((30.0, 30.0), (200.0, 50.0), 0xFF7FFF00),
+    let shapes = vec![
+        Circle::new_shape((720.0 / 2.0, 720.0 / 2.0), 300.0, 0xFFC0C0C0),
+        Circle::new_shape((100.0, 200.0), 80.0, 0xFFFFFFFF),
+        Rectangle::new_shape((240.0, 40.0), (80.0, 150.0), 0xFF0000FF),
+        Rectangle::new_shape((30.0, 30.0), (200.0, 50.0), 0xFF7FFF00),
     ];
 
-    let pixel_data = execute_gpu(&gpu_instance, circles, rectangles)
-        .await
-        .unwrap();
+    let pixel_data = execute_gpu(&gpu_instance, shapes).await.unwrap();
     let end = Instant::now();
     println!(
         "Processing took: {time}",
@@ -45,11 +41,7 @@ async fn run() {
     );
 }
 
-async fn execute_gpu(
-    gpu_instance: &GpuInstance,
-    circles: Vec<Circle>,
-    rectangles: Vec<Rectangle>,
-) -> Option<Vec<u8>> {
+async fn execute_gpu(gpu_instance: &GpuInstance, shapes: Vec<Shape>) -> Option<Vec<u8>> {
     let (width, height, device, circle_compute_pipeline, rect_compute_pipeline) = (
         gpu_instance.width,
         gpu_instance.height,
@@ -76,12 +68,16 @@ async fn execute_gpu(
     });
 
     let circle_bind_group_layout = circle_compute_pipeline.get_bind_group_layout(0);
-    let circle_bind_groups: Vec<_> = circles
+    let rect_bind_group_layout = rect_compute_pipeline.get_bind_group_layout(0);
+    let shape_bind_groups: Vec<_> = shapes
         .iter()
         .map(|c| {
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
-                layout: &circle_bind_group_layout,
+                layout: match c {
+                    Shape::Circle(_) => &circle_bind_group_layout,
+                    Shape::Rectangle(_) => &rect_bind_group_layout,
+                },
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -96,27 +92,6 @@ async fn execute_gpu(
         })
         .collect();
 
-    let rect_bind_group_layout = rect_compute_pipeline.get_bind_group_layout(0);
-    let rect_bind_groups: Vec<_> = rectangles
-        .iter()
-        .map(|r| {
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: None,
-                layout: &rect_bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: output_buffer.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: r.create_buffer(&device, width, height).as_entire_binding(),
-                    },
-                ],
-            })
-        })
-        .collect();
-
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     {
@@ -125,17 +100,20 @@ async fn execute_gpu(
             timestamp_writes: None,
         });
 
-        let mut draw_shape = |circle_compute_pipeline, circle_bind_group| {
-            cpass.set_pipeline(circle_compute_pipeline);
-            cpass.set_bind_group(0, circle_bind_group, &[]);
+        let mut draw_shape = |compute_pipeline, bind_group| {
+            cpass.set_pipeline(compute_pipeline);
+            cpass.set_bind_group(0, bind_group, &[]);
             cpass.dispatch_workgroups(width, height, 1);
         };
 
-        for bind_group in &circle_bind_groups {
-            draw_shape(&circle_compute_pipeline, bind_group);
-        }
-        for bind_group in &rect_bind_groups {
-            draw_shape(&rect_compute_pipeline, bind_group);
+        for (i, bind_group) in shape_bind_groups.iter().enumerate() {
+            draw_shape(
+                match &shapes[i] {
+                    Shape::Circle(_) => &circle_compute_pipeline,
+                    Shape::Rectangle(_) => &rect_compute_pipeline,
+                },
+                bind_group,
+            );
         }
     }
     encoder.copy_buffer_to_buffer(&output_buffer, 0, &staging_buffer, 0, size);
