@@ -21,6 +21,14 @@ impl<T> Signal<T> {
         (f)(unsafe { &mut *(self.inner.as_ref().as_ptr()) })
     }
 }
+impl<T> Signal<T>
+where
+    T: Clone,
+{
+    pub fn get(&self) -> T {
+        self.map(|x| x.clone())
+    }
+}
 
 pub struct SignalRead<T> {
     inner: Signal<T>,

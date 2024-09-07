@@ -36,7 +36,7 @@ async fn run() {
     circle.set_pos_x(DerivedSignal::new(|| 720.0 / 2.0));
     circle.set_pos_y(DerivedSignal::new(|| 720.0 / 2.0));
     circle.set_radius(DerivedSignal::new(|| {
-        time.map(|t| smoothstep(clamp01(inverse_lerp(*t as f32, 0.0, 60.0))) * 300.0)
+        smoothstep(clamp01(inverse_lerp(time.get() as f32, 0.0, 60.0))) * 300.0
     }));
     circle.set_colour(DerivedSignal::new(|| 0xFFFFFFFF));
 
