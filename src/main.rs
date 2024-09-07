@@ -3,7 +3,7 @@ mod shapes;
 use image::RgbaImage;
 use shapes::*;
 use std::{borrow::Cow, path::Path, time::Instant};
-use wgpu::{util::DeviceExt, ComputePipeline, ShaderModule};
+use wgpu::{util::DeviceExt, Buffer, ComputePipeline, ShaderModule};
 
 async fn run() {
     let gpu_instance = GpuInstance::new(
@@ -31,7 +31,7 @@ async fn run() {
         let height = smoothstep(clamp01(inverse_lerp(i as f32, 30.0, 90.0))) * 60.0;
         let y = smoothstep(clamp01(inverse_lerp(i as f32, 45.0, 105.0))) * 360.0;
         save_frame(&vec![
-            Circle::new_shape((720.0 / 2.0, 720.0 / 2.0), radius, 0xFFFFFF),
+            Circle::new_shape((720.0 / 2.0, 720.0 / 2.0), radius, 0xFFFFFFFF),
             Rectangle::new_shape(
                 (720.0 / 2.0 - 150.0, y - height / 2.0),
                 (300.0, height),
@@ -57,42 +57,19 @@ async fn render_and_save_frames(
     start_index: usize,
     format_name: impl Fn(usize) -> String,
 ) {
-    for (i, frame) in frames
-        .into_iter()
-        .enumerate()
-        .map(|(i, x)| (i + start_index, x))
-    {
-        render_and_save_frame(gpu_instance, frame, format_name(i).as_str()).await;
-    }
-}
+    let size = (std::mem::size_of::<u8>() as u64
+        * gpu_instance.width as u64
+        * gpu_instance.height as u64
+        * 4) as wgpu::BufferAddress;
 
-async fn render_and_save_frame(gpu_instance: &GpuInstance, shapes: Vec<Shape>, name: &str) {
-    let pixel_data = render_frame(&gpu_instance, shapes).await.unwrap();
-
-    let image = RgbaImage::from_raw(gpu_instance.width, gpu_instance.height, pixel_data)
-        .expect("Failed to create image!");
-
-    image.save(name).expect("Failed to save image!");
-}
-
-async fn render_frame(gpu_instance: &GpuInstance, shapes: Vec<Shape>) -> Option<Vec<u8>> {
-    let (width, height, device, circle_compute_pipeline, rect_compute_pipeline) = (
-        gpu_instance.width,
-        gpu_instance.height,
-        &gpu_instance.device,
-        &gpu_instance.circle_compute_pipeline,
-        &gpu_instance.rect_compute_pipeline,
-    );
-    let size = (std::mem::size_of::<u8>() as u32 * width * height * 4) as wgpu::BufferAddress;
-
-    let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+    let staging_buffer = gpu_instance.device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
         size,
         usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
 
-    let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+    let output_buffer = gpu_instance.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Output Buffer"),
         size,
         usage: wgpu::BufferUsages::STORAGE
@@ -100,6 +77,53 @@ async fn render_frame(gpu_instance: &GpuInstance, shapes: Vec<Shape>) -> Option<
             | wgpu::BufferUsages::COPY_SRC,
         mapped_at_creation: false,
     });
+
+    for (i, frame) in frames
+        .into_iter()
+        .enumerate()
+        .map(|(i, x)| (i + start_index, x))
+    {
+        render_and_save_frame(
+            gpu_instance,
+            frame,
+            format_name(i).as_str(),
+            &staging_buffer,
+            &output_buffer,
+        )
+        .await;
+    }
+}
+
+async fn render_and_save_frame(
+    gpu_instance: &GpuInstance,
+    shapes: Vec<Shape>,
+    name: &str,
+    staging_buffer: &Buffer,
+    output_buffer: &Buffer,
+) {
+    let pixel_data = render_frame(&gpu_instance, shapes, staging_buffer, output_buffer)
+        .await
+        .unwrap();
+
+    let image = RgbaImage::from_raw(gpu_instance.width, gpu_instance.height, pixel_data)
+        .expect("Failed to create image!");
+
+    image.save(name).expect("Failed to save image!");
+}
+
+async fn render_frame(
+    gpu_instance: &GpuInstance,
+    shapes: Vec<Shape>,
+    staging_buffer: &Buffer,
+    output_buffer: &Buffer,
+) -> Option<Vec<u8>> {
+    let (width, height, device, circle_compute_pipeline, rect_compute_pipeline) = (
+        gpu_instance.width,
+        gpu_instance.height,
+        &gpu_instance.device,
+        &gpu_instance.circle_compute_pipeline,
+        &gpu_instance.rect_compute_pipeline,
+    );
 
     let circle_bind_group_layout = circle_compute_pipeline.get_bind_group_layout(0);
     let rect_bind_group_layout = rect_compute_pipeline.get_bind_group_layout(0);
@@ -150,7 +174,7 @@ async fn render_frame(gpu_instance: &GpuInstance, shapes: Vec<Shape>) -> Option<
             );
         }
     }
-    encoder.copy_buffer_to_buffer(&output_buffer, 0, &staging_buffer, 0, size);
+    encoder.copy_buffer_to_buffer(&output_buffer, 0, &staging_buffer, 0, staging_buffer.size());
 
     gpu_instance.queue.submit(Some(encoder.finish()));
 
