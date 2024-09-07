@@ -65,11 +65,11 @@ impl<'a, T> DerivedSignal<'a, T> {
     }
 }
 
-impl<'a, T> From<T> for DerivedSignal<'a, T>
+impl<'a, T, F> From<F> for DerivedSignal<'a, T>
 where
-    T: Clone + 'a,
+    F: Fn() -> T + 'a,
 {
-    fn from(value: T) -> Self {
-        DerivedSignal::new(move || value.clone())
+    fn from(value: F) -> Self {
+        DerivedSignal::new(value)
     }
 }

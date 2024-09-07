@@ -33,12 +33,10 @@ async fn run() {
     let time = Signal::new(0usize);
 
     let circle = Circle::new(
-        720.0 / 2.0,
-        720.0 / 2.0,
-        DerivedSignal::new(|| {
-            smoothstep(clamp01(inverse_lerp(time.get() as f32, 0.0, 60.0))) * 300.0
-        }),
-        0xFFFFFFFF,
+        || 720.0 / 2.0,
+        || 720.0 / 2.0,
+        || smoothstep(clamp01(inverse_lerp(time.get() as f32, 0.0, 60.0))) * 300.0,
+        || 0xFFFFFFFF,
     );
 
     for _ in 0..60 {
