@@ -42,13 +42,40 @@ async fn run() {
 
     let count = frames.len();
     render_and_save_frames(&gpu_instance, frames, 0, format_name).await;
+    let frames_end = Instant::now();
+    println!("Saved frames. Exporting video...");
+    export_to_video();
 
     let end = Instant::now();
     println!(
-        "Time taken for {count} frames is {total_duration}ms - {fps}FPS!",
+        "Time taken for {count} frames is {total_duration}ms ({frame_duration}ms for exporting frames and {video_duration}ms for making a video) - {fps}FPS!",
         total_duration = end.duration_since(start).as_secs_f64(),
-        fps = count as f64 / end.duration_since(start).as_secs_f64()
+        fps = count as f64 / end.duration_since(start).as_secs_f64(),
+        frame_duration = frames_end.duration_since(start).as_secs_f64(),
+        video_duration = end.duration_since(frames_end).as_secs_f64(),
     );
+}
+
+fn export_to_video() {
+    std::process::Command::new("cmd")
+        .args([
+            "/C",
+            "ffmpeg",
+            "-framerate",
+            "30",
+            "-i",
+            "output/test-%d.bmp",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-r",
+            "60",
+            "output/output.mp4",
+        ])
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .expect("Failed to execute!");
 }
 
 async fn render_and_save_frames(
