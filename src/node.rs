@@ -1,33 +1,35 @@
-use crate::{Shape, SignalRead};
+use std::rc::Rc;
+
+use crate::{DerivedSignal, Shape, SignalRead};
 
 pub struct Circle<'a> {
-    position: (&'a dyn SignalRead<f32>, &'a dyn SignalRead<f32>),
-    radius: &'a dyn SignalRead<f32>,
-    colour: &'a dyn SignalRead<u32>,
+    position: (DerivedSignal<'a, f32>, DerivedSignal<'a, f32>),
+    radius: DerivedSignal<'a, f32>,
+    colour: DerivedSignal<'a, u32>,
 }
 impl<'a> Circle<'a> {
     pub fn new() -> Self {
         Self {
-            position: (&0.0f32 as &dyn SignalRead<_>, &0.0f32 as &dyn SignalRead<_>),
-            radius: &0.0f32 as &dyn SignalRead<_>,
-            colour: &0xFF000000u32 as &dyn SignalRead<_>,
+            position: (DerivedSignal::new(|| 0.0f32), DerivedSignal::new(|| 0.0f32)),
+            radius: DerivedSignal::new(|| 0.0f32),
+            colour: DerivedSignal::new(|| 0xFF000000u32),
         }
     }
 
-    pub fn set_pos_x(&mut self, x: impl SignalRead<f32> + 'a) {
-        self.position.0 = &x as &dyn SignalRead<f32>;
+    pub fn set_pos_x(&mut self, x: DerivedSignal<'a, f32>) {
+        self.position.0 = x;
     }
 
-    pub fn set_pos_y(&mut self, y: impl SignalRead<f32> + 'a) {
-        self.position.1 = &y as &dyn SignalRead<f32>;
+    pub fn set_pos_y(&mut self, y: DerivedSignal<'a, f32>) {
+        self.position.1 = y;
     }
 
-    pub fn set_radius(&mut self, radius: impl SignalRead<f32> + 'a) {
-        self.radius = &radius as &dyn SignalRead<f32>;
+    pub fn set_radius(&mut self, radius: DerivedSignal<'a, f32>) {
+        self.radius = radius;
     }
 
-    pub fn set_colour(&mut self, colour: impl SignalRead<u32> + 'a) {
-        self.colour = &colour as &dyn SignalRead<u32>;
+    pub fn set_colour(&mut self, colour: DerivedSignal<'a, u32>) {
+        self.colour = colour;
     }
 
     pub fn to_shape(&self) -> Shape {

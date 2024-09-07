@@ -30,15 +30,15 @@ async fn run() {
     let mut frames = Vec::with_capacity(120);
     let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
 
-    let mut radius = 0.0;
+    let mut radius = Signal::new(0.0f32);
 
     let mut circle = Circle::new();
-    circle.set_pos_x(720.0 / 2.0);
-    circle.set_pos_y(720.0 / 2.0);
-    circle.set_radius(|| radius);
+    circle.set_pos_x(DerivedSignal::new(|| 720.0 / 2.0));
+    circle.set_pos_y(DerivedSignal::new(|| 720.0 / 2.0));
+    circle.set_radius(DerivedSignal::new(|| radius.map(|x| *x)));
 
     for i in 0..120 {
-        radius = smoothstep(clamp01(inverse_lerp(i as f32, 0.0, 60.0))) * 300.0;
+        radius.update(|x| *x = smoothstep(clamp01(inverse_lerp(i as f32, 0.0, 60.0))) * 300.0);
         // let height = smoothstep(clamp01(inverse_lerp(i as f32, 30.0, 90.0))) * 60.0;
         // let y = smoothstep(clamp01(inverse_lerp(i as f32, 45.0, 105.0))) * 360.0;
 
