@@ -64,3 +64,12 @@ impl<'a, T> DerivedSignal<'a, T> {
         (self.computation)()
     }
 }
+
+impl<'a, T> From<T> for DerivedSignal<'a, T>
+where
+    T: Clone + 'a,
+{
+    fn from(value: T) -> Self {
+        DerivedSignal::new(move || value.clone())
+    }
+}

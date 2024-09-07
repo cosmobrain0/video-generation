@@ -8,28 +8,37 @@ pub struct Circle<'a> {
     colour: DerivedSignal<'a, u32>,
 }
 impl<'a> Circle<'a> {
-    pub fn new() -> Self {
+    pub fn new(
+        pos_x: impl Into<DerivedSignal<'a, f32>>,
+        pos_y: impl Into<DerivedSignal<'a, f32>>,
+        radius: impl Into<DerivedSignal<'a, f32>>,
+        colour: impl Into<DerivedSignal<'a, u32>>,
+    ) -> Self {
         Self {
-            position: (DerivedSignal::new(|| 0.0f32), DerivedSignal::new(|| 0.0f32)),
-            radius: DerivedSignal::new(|| 0.0f32),
-            colour: DerivedSignal::new(|| 0xFF000000u32),
+            position: (pos_x.into(), pos_y.into()),
+            radius: radius.into(),
+            colour: colour.into(),
         }
     }
 
-    pub fn set_pos_x(&mut self, x: DerivedSignal<'a, f32>) {
-        self.position.0 = x;
+    pub fn set_pos_x(&mut self, x: impl Into<DerivedSignal<'a, f32>>) -> &mut Self {
+        self.position.0 = x.into();
+        self
     }
 
-    pub fn set_pos_y(&mut self, y: DerivedSignal<'a, f32>) {
-        self.position.1 = y;
+    pub fn set_pos_y(&mut self, y: impl Into<DerivedSignal<'a, f32>>) -> &mut Self {
+        self.position.1 = y.into();
+        self
     }
 
-    pub fn set_radius(&mut self, radius: DerivedSignal<'a, f32>) {
-        self.radius = radius;
+    pub fn set_radius(&mut self, radius: impl Into<DerivedSignal<'a, f32>>) -> &mut Self {
+        self.radius = radius.into();
+        self
     }
 
-    pub fn set_colour(&mut self, colour: DerivedSignal<'a, u32>) {
-        self.colour = colour;
+    pub fn set_colour(&mut self, colour: impl Into<DerivedSignal<'a, u32>>) -> &mut Self {
+        self.colour = colour.into();
+        self
     }
 
     pub fn to_shape(&self) -> Shape {
@@ -38,5 +47,14 @@ impl<'a> Circle<'a> {
             radius: self.radius.get(),
             colour: self.colour.get(),
         })
+    }
+}
+impl Default for Circle {
+    fn default() -> Self {
+        Self {
+            position: (DerivedSignal::new(|| 0.0f32), DerivedSignal::new(|| 0.0f32)),
+            radius: DerivedSignal::new(|| 0.0f32),
+            colour: DerivedSignal::new(|| 0xFF000000u32),
+        }
     }
 }

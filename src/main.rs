@@ -32,13 +32,14 @@ async fn run() {
 
     let time = Signal::new(0usize);
 
-    let mut circle = Circle::new();
-    circle.set_pos_x(DerivedSignal::new(|| 720.0 / 2.0));
-    circle.set_pos_y(DerivedSignal::new(|| 720.0 / 2.0));
-    circle.set_radius(DerivedSignal::new(|| {
-        smoothstep(clamp01(inverse_lerp(time.get() as f32, 0.0, 60.0))) * 300.0
-    }));
-    circle.set_colour(DerivedSignal::new(|| 0xFFFFFFFF));
+    let circle = Circle::new(
+        720.0 / 2.0,
+        720.0 / 2.0,
+        DerivedSignal::new(|| {
+            smoothstep(clamp01(inverse_lerp(time.get() as f32, 0.0, 60.0))) * 300.0
+        }),
+        0xFFFFFFFF,
+    );
 
     for _ in 0..60 {
         time.update(|t| *t += 1);
