@@ -1,7 +1,11 @@
+mod node;
 mod shapes;
+mod signal;
 
 use image::RgbaImage;
+use node::Circle;
 use shapes::*;
+use signal::*;
 use std::{borrow::Cow, path::Path, time::Instant};
 use wgpu::{util::DeviceExt, Buffer, ComputePipeline, ShaderModule};
 
@@ -26,19 +30,32 @@ async fn run() {
     let mut frames = Vec::with_capacity(120);
     let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
 
+    let mut radius = 0.0;
+
+    let mut circle = Circle::new();
+    circle.set_pos_x(720.0 / 2.0);
+    circle.set_pos_y(720.0 / 2.0);
+    circle.set_radius(|| radius);
+
     for i in 0..120 {
-        let radius = smoothstep(clamp01(inverse_lerp(i as f32, 0.0, 60.0))) * 300.0;
-        let height = smoothstep(clamp01(inverse_lerp(i as f32, 30.0, 90.0))) * 60.0;
-        let y = smoothstep(clamp01(inverse_lerp(i as f32, 45.0, 105.0))) * 360.0;
+        radius = smoothstep(clamp01(inverse_lerp(i as f32, 0.0, 60.0))) * 300.0;
+        // let height = smoothstep(clamp01(inverse_lerp(i as f32, 30.0, 90.0))) * 60.0;
+        // let y = smoothstep(clamp01(inverse_lerp(i as f32, 45.0, 105.0))) * 360.0;
+
         save_frame(&vec![
-            Rectangle::new_shape((0.0, 0.0), (720.0, 720.0), 0),
-            Circle::new_shape((720.0 / 2.0, 720.0 / 2.0), radius, 0xFFFFFFFF),
-            Rectangle::new_shape(
-                (720.0 / 2.0 - 150.0, y - height / 2.0),
-                (300.0, height),
-                0xFF0000FF,
-            ),
+            RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0),
+            circle.to_shape(),
         ]);
+
+        // save_frame(&vec![
+        //     RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0),
+        //     CircleData::new_shape((720.0 / 2.0, 720.0 / 2.0), radius, 0xFFFFFFFF),
+        //     RectangleData::new_shape(
+        //         (720.0 / 2.0 - 150.0, y - height / 2.0),
+        //         (300.0, height),
+        //         0xFF0000FF,
+        //     ),
+        // ]);
     }
 
     let count = frames.len();
