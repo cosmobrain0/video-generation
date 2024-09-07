@@ -31,6 +31,7 @@ async fn run() {
         let height = smoothstep(clamp01(inverse_lerp(i as f32, 30.0, 90.0))) * 60.0;
         let y = smoothstep(clamp01(inverse_lerp(i as f32, 45.0, 105.0))) * 360.0;
         save_frame(&vec![
+            Rectangle::new_shape((0.0, 0.0), (720.0, 720.0), 0),
             Circle::new_shape((720.0 / 2.0, 720.0 / 2.0), radius, 0xFFFFFFFF),
             Rectangle::new_shape(
                 (720.0 / 2.0 - 150.0, y - height / 2.0),
@@ -72,6 +73,7 @@ fn export_to_video() {
             "-r",
             "60",
             "output/output.mp4",
+            "-y",
         ])
         .stderr(std::process::Stdio::inherit())
         .output()
