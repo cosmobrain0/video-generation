@@ -20,43 +20,39 @@ async fn run() {
 
     let format_name = |i| format!("output/test-{i}.bmp");
 
-    let clamp = |x: f32, min, max| x.min(max).max(min);
-    let clamp01 = |x| clamp(x, 0.0, 1.0);
-    let smoothstep = |x| x * x * (3.0 - 2.0 * x);
-    let inverse_lerp = |x, min, max| (x - min) / (max - min);
+    // let clamp = |x: f32, min, max| x.min(max).max(min);
+    // let clamp01 = |x| clamp(x, 0.0, 1.0);
+    // let smoothstep = |x| x * x * (3.0 - 2.0 * x);
+    // let inverse_lerp = |x, min, max| (x - min) / (max - min);
 
     println!("Starting...");
     let start = Instant::now();
     let mut frames = Vec::with_capacity(120);
     let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
 
-    let frame_count = Signal::new(0usize);
     let centre = Signal::new((720.0 / 2.0, 720.0 / 2.0));
-    let t = || clamp01(inverse_lerp(frame_count.get() as f32, 0.0, 60.0));
-    let radius = || smoothstep(t()) * 300.0;
-
-    let side_length = || radius() / f32::sqrt(2.0);
+    let velocity = Signal::new((0.0, 0.0));
+    let radius = 50.0f32;
 
     let circle = Circle::new(
         || centre.map(|c| c.0),
         || centre.map(|c| c.1),
-        radius,
-        || 0xFFFFFFFF,
+        || radius,
+        || {
+            centre.map(|c| {
+                let r = ((c.1 - 350.0) / 720.0 * 200.0 + 55.0).floor() as u32;
+                0xFF000000 + r
+            })
+        },
     );
-    let rectangle = Rectangle::new(
-        || centre.map(|c| c.0) - side_length(),
-        || centre.map(|c| c.1) - side_length(),
-        || side_length() * 2.0,
-        || side_length() * 2.0,
-        || 0xFF000000,
-    );
-    for _ in 0..60 {
-        frame_count.update(|f| *f += 1);
+    for _ in 0..200 {
+        let (new_centre, _, new_velocity) = physics_update(centre.get(), radius, velocity.get());
+        centre.update(|c| *c = new_centre);
+        velocity.update(|c| *c = new_velocity);
 
         save_frame(&vec![
             RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0),
             circle.to_shape(),
-            rectangle.to_shape(),
         ]);
     }
 
@@ -74,6 +70,22 @@ async fn run() {
         frame_duration = frames_end.duration_since(start).as_secs_f64(),
         video_duration = end.duration_since(frames_end).as_secs_f64(),
     );
+}
+
+fn physics_update<'a>(
+    mut centre: (f32, f32),
+    radius: f32,
+    mut velocity: (f32, f32),
+) -> ((f32, f32), f32, (f32, f32)) {
+    velocity.1 += 0.2;
+    centre.0 += velocity.0;
+    centre.1 += velocity.1;
+    if centre.1 + radius >= 720.0 {
+        centre.1 = 720.0 - radius;
+        velocity.1 = -velocity.1.abs();
+    }
+
+    (centre, radius, velocity)
 }
 
 fn export_to_video() {
