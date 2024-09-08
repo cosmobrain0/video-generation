@@ -66,6 +66,7 @@ async fn run() {
     let frames_end = Instant::now();
     println!("Saved frames. Exporting video...");
     export_to_video();
+    delete_saved_videos(0, count, format_name);
 
     let end = Instant::now();
     println!(
@@ -75,6 +76,13 @@ async fn run() {
         frame_duration = frames_end.duration_since(start).as_secs_f64(),
         video_duration = end.duration_since(frames_end).as_secs_f64(),
     );
+}
+
+fn delete_saved_videos(start_index: usize, count: usize, format_name: impl Fn(usize) -> String) {
+    for name in (start_index..count + start_index).map(format_name) {
+        std::fs::remove_file(&name)
+            .expect(format!("Failed to delete file {name}", name = &name).as_str());
+    }
 }
 
 fn physics_update<'a>(
