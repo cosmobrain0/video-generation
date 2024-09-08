@@ -2,6 +2,7 @@ mod node;
 mod shapes;
 mod signal;
 
+use colorsys::{ColorAlpha, Hsl, Rgb, RgbRatio};
 use image::RgbaImage;
 use node::{Circle, Rectangle};
 use shapes::*;
@@ -23,7 +24,7 @@ async fn run() {
     // let clamp = |x: f32, min, max| x.min(max).max(min);
     // let clamp01 = |x| clamp(x, 0.0, 1.0);
     // let smoothstep = |x| x * x * (3.0 - 2.0 * x);
-    // let inverse_lerp = |x, min, max| (x - min) / (max - min);
+    let inverse_lerp = |x, min, max| (x - min) / (max - min);
 
     println!("Starting...");
     let start = Instant::now();
@@ -31,7 +32,7 @@ async fn run() {
     let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
 
     let centre = Signal::new((720.0 / 2.0, 720.0 / 2.0));
-    let velocity = Signal::new((0.0, 0.0));
+    let velocity = Signal::new((3.0, 0.0));
     let radius = 50.0f32;
 
     let circle = Circle::new(
@@ -40,12 +41,16 @@ async fn run() {
         || radius,
         || {
             centre.map(|c| {
-                let r = ((c.1 - 350.0) / 720.0 * 200.0 + 55.0).floor() as u32;
-                0xFF000000 + r
+                let hue = inverse_lerp(c.0, 0.0, 720.0) * 360.0;
+                let saturation = 100.0;
+                let luminance = inverse_lerp(c.1, 350.0, 720.0) * 50.0;
+                let colour = Hsl::new(hue as f64, saturation as f64, luminance as f64, Some(1.0));
+                let [red, green, blue]: [u8; 3] = Rgb::from(colour).into();
+                0xFF000000 + ((red as u32) << 16) + ((green as u32) << 8) + blue as u32
             })
         },
     );
-    for _ in 0..200 {
+    for _ in 0..600 {
         let (new_centre, _, new_velocity) = physics_update(centre.get(), radius, velocity.get());
         centre.update(|c| *c = new_centre);
         velocity.update(|c| *c = new_velocity);
@@ -78,11 +83,23 @@ fn physics_update<'a>(
     mut velocity: (f32, f32),
 ) -> ((f32, f32), f32, (f32, f32)) {
     velocity.1 += 0.2;
+
     centre.0 += velocity.0;
     centre.1 += velocity.1;
+
     if centre.1 + radius >= 720.0 {
         centre.1 = 720.0 - radius;
         velocity.1 = -velocity.1.abs();
+    }
+
+    if centre.0 + radius >= 720.0 {
+        centre.0 = 720.0 - radius;
+        velocity.0 = -velocity.0.abs();
+    }
+
+    if centre.0 - radius <= 0.0 {
+        centre.0 = radius;
+        velocity.0 = velocity.0.abs();
     }
 
     (centre, radius, velocity)
