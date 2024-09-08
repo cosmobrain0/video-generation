@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 #[derive(Clone)]
 pub struct Signal<T> {
@@ -49,6 +49,14 @@ impl<T> From<Signal<T>> for SignalRead<T> {
         Self { inner: value }
     }
 }
+impl<T> SignalRead<T>
+where
+    T: Clone,
+{
+    pub fn get(&self) -> T {
+        self.map(|x| x.clone())
+    }
+}
 
 pub struct DerivedSignal<'a, T> {
     computation: Box<dyn Fn() -> T + 'a>,
@@ -71,5 +79,22 @@ where
 {
     fn from(value: F) -> Self {
         DerivedSignal::new(value)
+    }
+}
+
+impl<'a, T> From<&'a SignalRead<T>> for DerivedSignal<'a, T>
+where
+    T: Clone,
+{
+    fn from(value: &'a SignalRead<T>) -> Self {
+        DerivedSignal::new(move || value.map(|x| x.clone()))
+    }
+}
+impl<'a, T> From<&'a Signal<T>> for DerivedSignal<'a, T>
+where
+    T: Clone,
+{
+    fn from(value: &'a Signal<T>) -> Self {
+        DerivedSignal::new(move || value.map(|x| x.clone()))
     }
 }

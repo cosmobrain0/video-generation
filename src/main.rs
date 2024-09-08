@@ -3,7 +3,7 @@ mod shapes;
 mod signal;
 
 use image::RgbaImage;
-use node::Circle;
+use node::{Circle, Rectangle};
 use shapes::*;
 use signal::*;
 use std::{borrow::Cow, path::Path, time::Instant};
@@ -30,21 +30,33 @@ async fn run() {
     let mut frames = Vec::with_capacity(120);
     let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
 
-    let time = Signal::new(0usize);
+    let frame_count = Signal::new(0usize);
+    let centre = Signal::new((720.0 / 2.0, 720.0 / 2.0));
+    let t = || clamp01(inverse_lerp(frame_count.get() as f32, 0.0, 60.0));
+    let radius = || smoothstep(t()) * 300.0;
+
+    let side_length = || radius() / f32::sqrt(2.0);
 
     let circle = Circle::new(
-        || 720.0 / 2.0,
-        || 720.0 / 2.0,
-        || smoothstep(clamp01(inverse_lerp(time.get() as f32, 0.0, 60.0))) * 300.0,
+        || centre.map(|c| c.0),
+        || centre.map(|c| c.1),
+        radius,
         || 0xFFFFFFFF,
     );
-
+    let rectangle = Rectangle::new(
+        || centre.map(|c| c.0) - side_length(),
+        || centre.map(|c| c.1) - side_length(),
+        || side_length() * 2.0,
+        || side_length() * 2.0,
+        || 0xFF000000,
+    );
     for _ in 0..60 {
-        time.update(|t| *t += 1);
+        frame_count.update(|f| *f += 1);
 
         save_frame(&vec![
             RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0),
             circle.to_shape(),
+            rectangle.to_shape(),
         ]);
     }
 
