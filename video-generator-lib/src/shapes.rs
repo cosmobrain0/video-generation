@@ -90,12 +90,7 @@ pub struct GpuInstance {
     pub rect_compute_pipeline: ComputePipeline,
 }
 impl GpuInstance {
-    pub async fn new(
-        width: u32,
-        height: u32,
-        circle_shader_path: &Path,
-        rect_shader_path: &Path,
-    ) -> Self {
+    pub async fn new(width: u32, height: u32, circle_shader: &str, rect_shader: &str) -> Self {
         let instance = wgpu::Instance::default();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions::default())
@@ -115,17 +110,11 @@ impl GpuInstance {
             .unwrap();
         let circle_cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(
-                std::fs::read_to_string(circle_shader_path)
-                    .unwrap()
-                    .as_str(),
-            )),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(circle_shader)),
         });
         let rect_cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(
-                std::fs::read_to_string(rect_shader_path).unwrap().as_str(),
-            )),
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(rect_shader)),
         });
         let circle_compute_pipeline =
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
