@@ -2,15 +2,18 @@ mod node;
 mod shapes;
 mod signal;
 
-use colorsys::{ColorAlpha, Hsl, Rgb, RgbRatio};
+use colorsys::{Hsl, Rgb};
 use image::RgbaImage;
-use node::{Circle, Rectangle};
+use node::Circle;
 use shapes::*;
 use signal::*;
-use std::{borrow::Cow, path::Path, time::Instant};
-use wgpu::{util::DeviceExt, Buffer, ComputePipeline, ShaderModule};
+use std::{path::Path, time::Instant};
+use wgpu::Buffer;
 
 async fn run() {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let (start_frame, end_frame): (usize, usize) =
+        (args[0].parse().unwrap(), args[1].parse().unwrap());
     let gpu_instance = GpuInstance::new(
         720,
         720,
@@ -24,13 +27,46 @@ async fn run() {
     // let clamp = |x: f32, min, max| x.min(max).max(min);
     // let clamp01 = |x| clamp(x, 0.0, 1.0);
     // let smoothstep = |x| x * x * (3.0 - 2.0 * x);
-    let inverse_lerp = |x, min, max| (x - min) / (max - min);
 
     println!("Starting...");
     let start = Instant::now();
     let mut frames = Vec::with_capacity(120);
-    let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
+    let save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
 
+    generate_frames(save_frame);
+
+    let start_frame = start_frame.min(frames.len() - 1);
+    let end_frame = end_frame.min(frames.len() - 1).max(start_frame);
+    let count = end_frame - start_frame;
+    let generate_frames_end = Instant::now();
+    render_and_save_frames(
+        &gpu_instance,
+        frames
+            .into_iter()
+            .skip(start_frame)
+            .take(end_frame - start_frame),
+        0,
+        format_name,
+    )
+    .await;
+    let frames_end = Instant::now();
+    println!("Saved frames. Exporting video...");
+    export_to_video();
+    delete_saved_videos(0, count, format_name);
+
+    let end = Instant::now();
+    println!(
+        "Time taken for {count} frames is {total_duration}ms ({generation_duration} for generating frames, {frame_duration}ms for exporting frames and {video_duration}ms for making a video) - {fps}FPS!",
+        total_duration = end.duration_since(start).as_secs_f64(),
+        fps = count as f64 / end.duration_since(start).as_secs_f64(),
+        generation_duration = generate_frames_end.duration_since(start).as_secs_f64(),
+        frame_duration = frames_end.duration_since(generate_frames_end).as_secs_f64(),
+        video_duration = end.duration_since(frames_end).as_secs_f64(),
+    );
+}
+
+fn generate_frames(mut save_frame: impl FnMut(&Vec<Shape>)) {
+    let inverse_lerp = |x, min, max| (x - min) / (max - min);
     let centre = Signal::new((720.0 / 2.0, 720.0 / 2.0));
     let velocity = Signal::new((3.0, 0.0));
     let radius = 50.0f32;
@@ -60,22 +96,6 @@ async fn run() {
             circle.to_shape(),
         ]);
     }
-
-    let count = frames.len();
-    render_and_save_frames(&gpu_instance, frames, 0, format_name).await;
-    let frames_end = Instant::now();
-    println!("Saved frames. Exporting video...");
-    export_to_video();
-    delete_saved_videos(0, count, format_name);
-
-    let end = Instant::now();
-    println!(
-        "Time taken for {count} frames is {total_duration}ms ({frame_duration}ms for exporting frames and {video_duration}ms for making a video) - {fps}FPS!",
-        total_duration = end.duration_since(start).as_secs_f64(),
-        fps = count as f64 / end.duration_since(start).as_secs_f64(),
-        frame_duration = frames_end.duration_since(start).as_secs_f64(),
-        video_duration = end.duration_since(frames_end).as_secs_f64(),
-    );
 }
 
 fn delete_saved_videos(start_index: usize, count: usize, format_name: impl Fn(usize) -> String) {
@@ -138,7 +158,7 @@ fn export_to_video() {
 
 async fn render_and_save_frames(
     gpu_instance: &GpuInstance,
-    frames: Vec<Vec<Shape>>,
+    frames: impl Iterator<Item = Vec<Shape>>,
     start_index: usize,
     format_name: impl Fn(usize) -> String,
 ) {
@@ -163,11 +183,7 @@ async fn render_and_save_frames(
         mapped_at_creation: false,
     });
 
-    for (i, frame) in frames
-        .into_iter()
-        .enumerate()
-        .map(|(i, x)| (i + start_index, x))
-    {
+    for (i, frame) in frames.enumerate().map(|(i, x)| (i + start_index, x)) {
         render_and_save_frame(
             gpu_instance,
             frame,
