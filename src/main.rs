@@ -1,7 +1,12 @@
+mod node;
 mod shapes;
+mod signal;
 
+use colorsys::{ColorAlpha, Hsl, Rgb, RgbRatio};
 use image::RgbaImage;
+use node::{Circle, Rectangle};
 use shapes::*;
+use signal::*;
 use std::{borrow::Cow, path::Path, time::Instant};
 use wgpu::{util::DeviceExt, Buffer, ComputePipeline, ShaderModule};
 
@@ -16,9 +21,9 @@ async fn run() {
 
     let format_name = |i| format!("output/test-{i}.bmp");
 
-    let clamp = |x: f32, min, max| x.min(max).max(min);
-    let clamp01 = |x| clamp(x, 0.0, 1.0);
-    let smoothstep = |x| x * x * (3.0 - 2.0 * x);
+    // let clamp = |x: f32, min, max| x.min(max).max(min);
+    // let clamp01 = |x| clamp(x, 0.0, 1.0);
+    // let smoothstep = |x| x * x * (3.0 - 2.0 * x);
     let inverse_lerp = |x, min, max| (x - min) / (max - min);
 
     println!("Starting...");
@@ -26,18 +31,33 @@ async fn run() {
     let mut frames = Vec::with_capacity(120);
     let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
 
-    for i in 0..120 {
-        let radius = smoothstep(clamp01(inverse_lerp(i as f32, 0.0, 60.0))) * 300.0;
-        let height = smoothstep(clamp01(inverse_lerp(i as f32, 30.0, 90.0))) * 60.0;
-        let y = smoothstep(clamp01(inverse_lerp(i as f32, 45.0, 105.0))) * 360.0;
+    let centre = Signal::new((720.0 / 2.0, 720.0 / 2.0));
+    let velocity = Signal::new((3.0, 0.0));
+    let radius = 50.0f32;
+
+    let circle = Circle::new(
+        || centre.map(|c| c.0),
+        || centre.map(|c| c.1),
+        || radius,
+        || {
+            centre.map(|c| {
+                let hue = inverse_lerp(c.0, 0.0, 720.0) * 360.0;
+                let saturation = 100.0;
+                let luminance = inverse_lerp(c.1, 350.0, 720.0) * 50.0;
+                let colour = Hsl::new(hue as f64, saturation as f64, luminance as f64, Some(1.0));
+                let [red, green, blue]: [u8; 3] = Rgb::from(colour).into();
+                0xFF000000 + ((red as u32) << 16) + ((green as u32) << 8) + blue as u32
+            })
+        },
+    );
+    for _ in 0..600 {
+        let (new_centre, _, new_velocity) = physics_update(centre.get(), radius, velocity.get());
+        centre.update(|c| *c = new_centre);
+        velocity.update(|c| *c = new_velocity);
+
         save_frame(&vec![
-            Rectangle::new_shape((0.0, 0.0), (720.0, 720.0), 0),
-            Circle::new_shape((720.0 / 2.0, 720.0 / 2.0), radius, 0xFFFFFFFF),
-            Rectangle::new_shape(
-                (720.0 / 2.0 - 150.0, y - height / 2.0),
-                (300.0, height),
-                0xFF0000FF,
-            ),
+            RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0),
+            circle.to_shape(),
         ]);
     }
 
@@ -46,6 +66,7 @@ async fn run() {
     let frames_end = Instant::now();
     println!("Saved frames. Exporting video...");
     export_to_video();
+    delete_saved_videos(0, count, format_name);
 
     let end = Instant::now();
     println!(
@@ -55,6 +76,41 @@ async fn run() {
         frame_duration = frames_end.duration_since(start).as_secs_f64(),
         video_duration = end.duration_since(frames_end).as_secs_f64(),
     );
+}
+
+fn delete_saved_videos(start_index: usize, count: usize, format_name: impl Fn(usize) -> String) {
+    for name in (start_index..count + start_index).map(format_name) {
+        std::fs::remove_file(&name)
+            .expect(format!("Failed to delete file {name}", name = &name).as_str());
+    }
+}
+
+fn physics_update<'a>(
+    mut centre: (f32, f32),
+    radius: f32,
+    mut velocity: (f32, f32),
+) -> ((f32, f32), f32, (f32, f32)) {
+    velocity.1 += 0.2;
+
+    centre.0 += velocity.0;
+    centre.1 += velocity.1;
+
+    if centre.1 + radius >= 720.0 {
+        centre.1 = 720.0 - radius;
+        velocity.1 = -velocity.1.abs();
+    }
+
+    if centre.0 + radius >= 720.0 {
+        centre.0 = 720.0 - radius;
+        velocity.0 = -velocity.0.abs();
+    }
+
+    if centre.0 - radius <= 0.0 {
+        centre.0 = radius;
+        velocity.0 = velocity.0.abs();
+    }
+
+    (centre, radius, velocity)
 }
 
 fn export_to_video() {

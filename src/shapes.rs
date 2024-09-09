@@ -3,12 +3,12 @@ use std::{borrow::Cow, path::Path};
 use wgpu::{util::DeviceExt as _, Adapter, Buffer, ComputePipeline, Device, Queue};
 
 #[derive(Debug, Clone)]
-pub struct Circle {
+pub struct CircleData {
     pub position: (f32, f32),
     pub radius: f32,
     pub colour: u32,
 }
-impl Circle {
+impl CircleData {
     pub fn new(position: (f32, f32), radius: f32, colour: u32) -> Self {
         Self {
             position,
@@ -42,12 +42,12 @@ impl Circle {
 }
 
 #[derive(Debug, Clone)]
-pub struct Rectangle {
+pub struct RectangleData {
     pub position: (f32, f32),
     pub size: (f32, f32),
     pub colour: u32,
 }
-impl Rectangle {
+impl RectangleData {
     pub fn new(position: (f32, f32), size: (f32, f32), colour: u32) -> Self {
         Self {
             position,
@@ -160,8 +160,8 @@ impl GpuInstance {
 
 #[derive(Debug, Clone)]
 pub enum Shape {
-    Circle(Circle),
-    Rectangle(Rectangle),
+    Circle(CircleData),
+    Rectangle(RectangleData),
 }
 impl Shape {
     pub fn create_buffer(&self, device: &Device, width: u32, height: u32) -> Buffer {
