@@ -1,10 +1,6 @@
 use colorsys::{Hsl, Rgb};
 use video_generator_lib::{node::*, shapes::*, signal::*};
 
-async fn run() {
-    video_generator_lib::run(generate_frames).await;
-}
-
 fn generate_frames(save_frame: &mut dyn FnMut(&Vec<Shape>)) {
     let inverse_lerp = |x, min, max| (x - min) / (max - min);
     let centre = Signal::new((720.0 / 2.0, 720.0 / 2.0));
@@ -67,14 +63,25 @@ fn physics_update<'a>(
 }
 
 pub fn main() {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let (start_frame, end_frame): (usize, usize) =
+        (args[0].parse().unwrap(), args[1].parse().unwrap());
     #[cfg(not(target_arch = "wasm32"))]
     {
-        pollster::block_on(run());
+        pollster::block_on(video_generator_lib::run(
+            generate_frames,
+            start_frame,
+            end_frame,
+        ));
     }
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init().expect("could not initialize logger");
-        wasm_bindgen_futures::spawn_local(run());
+        wasm_bindgen_futures::spawn_local(video_generator_lib::run(
+            generate_frames,
+            start_frame,
+            end_frame,
+        ));
     }
 }

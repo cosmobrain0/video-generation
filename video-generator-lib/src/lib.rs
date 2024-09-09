@@ -9,10 +9,11 @@ use signal::*;
 use std::{path::Path, time::Instant};
 use wgpu::Buffer;
 
-pub async fn run(generate_frames: impl Fn(&mut dyn FnMut(&Vec<Shape>))) {
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    let (start_frame, end_frame): (usize, usize) =
-        (args[0].parse().unwrap(), args[1].parse().unwrap());
+pub async fn run(
+    generate_frames: impl Fn(&mut dyn FnMut(&Vec<Shape>)),
+    start_frame: usize,
+    end_frame: usize,
+) {
     let gpu_instance = GpuInstance::new(
         720,
         720,
