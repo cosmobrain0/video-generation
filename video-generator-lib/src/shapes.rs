@@ -26,6 +26,7 @@ impl CircleData {
     }
 
     pub fn create_buffer(&self, device: &Device, width: u32, height: u32) -> Buffer {
+        let (x, y, _, _) = self.bounding_box();
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Circle Uniform Buffer"),
             contents: bytemuck::cast_slice(&[
@@ -33,11 +34,22 @@ impl CircleData {
                 bytemuck::cast(self.position.1),
                 bytemuck::cast(self.radius),
                 width,
+                x,
+                y,
                 self.colour,
                 0,
             ]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         })
+    }
+
+    pub fn bounding_box(&self) -> (u32, u32, u32, u32) {
+        (
+            (self.position.0 - self.radius).floor() as u32,
+            (self.position.1 - self.radius).floor() as u32,
+            (self.radius * 2.0).floor() as u32,
+            (self.radius * 2.0).floor() as u32,
+        )
     }
 }
 
@@ -65,6 +77,7 @@ impl RectangleData {
     }
 
     pub fn create_buffer(&self, device: &Device, width: u32, height: u32) -> Buffer {
+        let (x, y, _, _) = self.bounding_box();
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Circle Uniform Buffer"),
             contents: bytemuck::cast_slice(&[
@@ -73,10 +86,21 @@ impl RectangleData {
                 bytemuck::cast(self.size.0),
                 bytemuck::cast(self.size.1),
                 width,
+                x,
+                y,
                 self.colour,
             ]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         })
+    }
+
+    pub fn bounding_box(&self) -> (u32, u32, u32, u32) {
+        (
+            self.position.0.floor() as u32,
+            self.position.1.floor() as u32,
+            self.size.0.floor() as u32,
+            self.size.1.floor() as u32,
+        )
     }
 }
 
@@ -157,6 +181,13 @@ impl Shape {
         match self {
             Shape::Circle(x) => x.create_buffer(device, width, height),
             Shape::Rectangle(x) => x.create_buffer(device, width, height),
+        }
+    }
+
+    pub fn bounding_box(&self) -> (u32, u32, u32, u32) {
+        match self {
+            Shape::Circle(x) => x.bounding_box(),
+            Shape::Rectangle(x) => x.bounding_box(),
         }
     }
 }

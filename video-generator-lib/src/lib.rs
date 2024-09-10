@@ -198,18 +198,22 @@ async fn render_frame(
             timestamp_writes: None,
         });
 
-        let mut draw_shape = |compute_pipeline, bind_group| {
-            cpass.set_pipeline(compute_pipeline);
-            cpass.set_bind_group(0, bind_group, &[]);
-            cpass.dispatch_workgroups(width, height, 1);
-        };
+        let mut draw_shape =
+            |compute_pipeline, bounding_box_width, bounding_box_height, bind_group| {
+                cpass.set_pipeline(compute_pipeline);
+                cpass.set_bind_group(0, bind_group, &[]);
+                cpass.dispatch_workgroups(bounding_box_width, bounding_box_height, 1);
+            };
 
         for (i, bind_group) in shape_bind_groups.iter().enumerate() {
+            let (_, _, width, height) = shapes[i].bounding_box();
             draw_shape(
                 match &shapes[i] {
                     Shape::Circle(_) => &circle_compute_pipeline,
                     Shape::Rectangle(_) => &rect_compute_pipeline,
                 },
+                width,
+                height,
                 bind_group,
             );
         }
