@@ -30,6 +30,7 @@ fn generate_frames(save_frame: &mut dyn FnMut(&Vec<Shape>)) {
         save_frame(&vec![
             RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0),
             circle.to_shape(),
+            RectangleData::new_shape((720.0 / 2.0, 720.0 / 2.0), (100.0, 200.0), 0xFFFF0000),
         ]);
     }
 }

@@ -77,16 +77,7 @@ impl RectangleData {
         let (x, y, _, _) = self.bounding_box();
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Circle Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[
-                bytemuck::cast::<_, u32>(self.position.0),
-                bytemuck::cast(self.position.1),
-                bytemuck::cast(self.size.0),
-                bytemuck::cast(self.size.1),
-                width,
-                x,
-                y,
-                self.colour,
-            ]),
+            contents: bytemuck::cast_slice(&[width, x, y, self.colour]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         })
     }

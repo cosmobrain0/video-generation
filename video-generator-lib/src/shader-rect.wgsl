@@ -3,8 +3,6 @@
 var<storage, read_write> v_indices_output: array<u32>;
 
 struct Uniforms {
-    position: vec2<f32>,
-    size: vec2<f32>,
     width: u32,
     offset_x: u32,
     offset_y: u32,
@@ -20,14 +18,7 @@ var<uniform> uniforms: Uniforms;
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let global_id_offset: vec2<u32> = vec2<u32>(global_id.x+uniforms.offset_x, global_id.y+uniforms.offset_y);
     let id: u32 = global_id_offset.y*uniforms.width + global_id_offset.x;
-    let x: f32 = f32(global_id_offset.x);
-    let y: f32 = f32(global_id_offset.y);
 
-    if (
-        x >= uniforms.position.x && x <= uniforms.position.x + uniforms.size.x &&
-        y >= uniforms.position.y && y <= uniforms.position.y + uniforms.size.y
-    ) {
-        v_indices_output[id] = uniforms.colour;
-    }
+    v_indices_output[id] = uniforms.colour;
 }
 
