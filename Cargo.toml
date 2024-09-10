@@ -10,3 +10,4 @@ wasm-bindgen = "0.2.93"
 wasm-bindgen-futures = "0.4.43"
 wgpu = "22.1.0"
 video-generator-lib = { path = "./video-generator-lib/" }
+vector2 = "0.1.5"

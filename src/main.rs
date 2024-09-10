@@ -1,7 +1,9 @@
+mod object;
+
 use colorsys::{Hsl, Rgb};
 use video_generator_lib::{node::*, shapes::*, signal::*};
 
-fn generate_frames(save_frame: &mut dyn FnMut(&Vec<Shape>)) {
+fn generate_frames(save_frame: &mut dyn FnMut(Vec<Shape>)) {
     let inverse_lerp = |x, min, max| (x - min) / (max - min);
     let centre = Signal::new((720.0 / 2.0, 720.0 / 2.0));
     let velocity = Signal::new((3.0, 0.0));
@@ -27,7 +29,7 @@ fn generate_frames(save_frame: &mut dyn FnMut(&Vec<Shape>)) {
         centre.update(|c| *c = new_centre);
         velocity.update(|c| *c = new_velocity);
 
-        save_frame(&vec![
+        save_frame(vec![
             RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0),
             circle.to_shape(),
             RectangleData::new_shape((720.0 / 2.0, 720.0 / 2.0), (100.0, 200.0), 0xFFFF0000),

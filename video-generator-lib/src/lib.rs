@@ -10,7 +10,7 @@ use std::{path::Path, time::Instant};
 use wgpu::Buffer;
 
 pub async fn run(
-    generate_frames: impl Fn(&mut dyn FnMut(&Vec<Shape>)),
+    generate_frames: impl Fn(&mut dyn FnMut(Vec<Shape>)),
     start_frame: usize,
     end_frame: usize,
 ) {
@@ -31,7 +31,7 @@ pub async fn run(
     println!("Starting...");
     let start = Instant::now();
     let mut frames = Vec::with_capacity(120);
-    let mut save_frame = |frame: &Vec<Shape>| frames.push(frame.clone());
+    let mut save_frame = |frame: Vec<Shape>| frames.push(frame);
 
     generate_frames(&mut save_frame);
 
