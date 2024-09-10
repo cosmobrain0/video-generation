@@ -30,14 +30,11 @@ impl CircleData {
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Circle Uniform Buffer"),
             contents: bytemuck::cast_slice(&[
-                bytemuck::cast::<_, u32>(self.position.0),
-                bytemuck::cast(self.position.1),
                 bytemuck::cast(self.radius),
                 width,
                 x,
                 y,
                 self.colour,
-                0,
             ]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         })
