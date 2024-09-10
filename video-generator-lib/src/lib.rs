@@ -78,7 +78,7 @@ fn export_to_video() {
             "/C",
             "ffmpeg",
             "-framerate",
-            "30",
+            "60",
             "-i",
             "output/test-%d.bmp",
             "-c:v",
