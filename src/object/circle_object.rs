@@ -35,8 +35,8 @@ macro_rules! declare_object {
             fn set_transform(&mut self, transform: DerivedSignal<'a, Transform>) {
                 self.transform = transform;
             }
-            fn children(&self) -> DerivedSignal<'a, Vec<Rc<dyn Object<'a>>>> {
-                self.children.clone()
+            fn children(&self) -> &DerivedSignal<'a, Vec<Rc<dyn Object<'a>>>> {
+                &self.children
             }
 
             fn set_children(&mut self, children: DerivedSignal<'a, Vec<Rc<dyn Object<'a>>>>) {

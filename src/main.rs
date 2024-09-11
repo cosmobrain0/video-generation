@@ -1,39 +1,47 @@
 mod object;
 
+use std::rc::Rc;
+
 use colorsys::{Hsl, Rgb};
+use object::{CircleObject, Object};
 use video_generator_lib::{node::*, shapes::*, signal::*};
 
 fn generate_frames(save_frame: &mut dyn FnMut(Vec<Shape>)) {
-    let inverse_lerp = |x, min, max| (x - min) / (max - min);
-    let centre = Signal::new((720.0 / 2.0, 720.0 / 2.0));
-    let velocity = Signal::new((3.0, 0.0));
-    let radius = 50.0f32;
+    let time = Rc::new(Signal::new(0.0f32));
+    let fast_time = {
+        let time = Rc::clone(&time);
+        Rc::new(move || time.get() * 3.0)
+    };
+    let radius = 50.0;
 
-    let circle = Circle::new(
-        || centre.map(|c| c.0),
-        || centre.map(|c| c.1),
-        || radius,
-        || {
-            centre.map(|c| {
-                let hue = inverse_lerp(c.0, 0.0, 720.0) * 360.0;
-                let saturation = 100.0;
-                let luminance = inverse_lerp(c.1, 350.0, 720.0) * 50.0;
-                let colour = Hsl::new(hue as f64, saturation as f64, luminance as f64, Some(1.0));
-                let [red, green, blue]: [u8; 3] = Rgb::from(colour).into();
-                0xFF000000 + ((red as u32) << 16) + ((green as u32) << 8) + blue as u32
-            })
-        },
+    let circle_time = Rc::clone(&time);
+    let mut circle = CircleObject::new(
+        move || 720.0 / 2.0 + circle_time.get().sin() * (720.0 / 2.0 - radius),
+        || 720.0 / 2.0,
+        move || radius,
+        || 0xFFFFFFFF,
     );
-    for _ in 0..600 {
-        let (new_centre, _, new_velocity) = physics_update(centre.get(), radius, velocity.get());
-        centre.update(|c| *c = new_centre);
-        velocity.update(|c| *c = new_velocity);
+    let fast_time_x = Rc::clone(&fast_time);
+    let fast_time_y = Rc::clone(&fast_time);
+    let mut other_circle = Rc::new(CircleObject::new(
+        move || fast_time_x().sin() * 80.0,
+        move || fast_time_y().cos() * 80.0,
+        move || radius / 2.0,
+        || 0xFF0000FF,
+    ));
+    circle.set_children(DerivedSignal::new(move || {
+        vec![Rc::clone(&other_circle) as Rc<dyn Object>]
+    }));
 
-        save_frame(vec![
-            RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0),
-            circle.to_shape(),
-            RectangleData::new_shape((720.0 / 2.0, 720.0 / 2.0), (100.0, 200.0), 0xFFFF0000),
-        ]);
+    for _ in 0..600 {
+        time.update(|t| *t += 0.1);
+
+        save_frame(
+            [RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0)]
+                .into_iter()
+                .chain(circle.to_shapes_recursive().into_iter())
+                .collect(),
+        );
     }
 }
 
