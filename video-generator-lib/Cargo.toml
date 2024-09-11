@@ -1,13 +1,13 @@
 [package]
-name = "video-generation"
+name = "video-generator-lib"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-colorsys = "0.6.7"
+bytemuck = "1.17.1"
+flume = "0.11.0"
+image = "0.25.2"
 pollster = "0.3.0"
 wasm-bindgen = "0.2.93"
 wasm-bindgen-futures = "0.4.43"
 wgpu = "22.1.0"
-video-generator-lib = { path = "./video-generator-lib/" }
-vector2 = "0.1.5"
