@@ -1524,6 +1524,7 @@ dependencies = [
  "flume",
  "image",
  "pollster",
+ "vector2",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wgpu",

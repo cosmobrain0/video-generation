@@ -1,5 +1,6 @@
 use super::{Object, Transform};
 use std::rc::Rc;
+use vector2::Vector2;
 use video_generator_lib::shapes::{CircleData, Shape};
 use video_generator_lib::signal::DerivedSignal;
 
@@ -58,18 +59,17 @@ macro_rules! declare_object {
 
 declare_object! {
     pub struct CircleObject {
-        pub position_x: f32 => set_position_x,
-        pub position_y: f32 => set_position_y,
         pub radius: f32 => set_radius,
         pub colour: u32 => set_colour,
     }
     impl CircleObject {
         fn to_shapes(&self) -> Vec<Shape> {
+            let transform = self.transform.get();
             vec![
                 Shape::Circle(
                     CircleData::new(
-                        (self.position_x.get(), self.position_y.get()),
-                        self.radius.get(),
+                        (transform.position.x as f32, transform.position.y as f32),
+                        self.radius.get() * transform.scale as f32,
                         self.colour.get()
                     )
                 )

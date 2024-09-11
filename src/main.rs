@@ -1,40 +1,111 @@
 mod object;
 
-use std::rc::Rc;
+use std::{ops::Sub, rc::Rc};
 
 use colorsys::{Hsl, Rgb};
 use object::{CircleObject, Object};
+use vector2::Vector2;
 use video_generator_lib::{node::*, shapes::*, signal::*};
 
 fn generate_frames(save_frame: &mut dyn FnMut(Vec<Shape>)) {
+    horizontal_circle(save_frame);
+    final_part(save_frame, 0xFFFFFFFF);
+    final_part(save_frame, 0);
+}
+
+fn horizontal_circle(save_frame: &mut dyn FnMut(Vec<Shape>)) {
+    let time = Rc::new(Signal::new(0.0f32));
+    let radius = Rc::new(Signal::new(0.0));
+
+    let mut circle = {
+        let (radius_1, radius_2) = (Rc::clone(&radius), Rc::clone(&radius));
+        let mut circle = CircleObject::new(move || radius_1.get(), || 0xFFFFFFFF);
+        let circle_time = Rc::clone(&time);
+        let circle_position_x =
+            move || 720.0 / 2.0 + circle_time.get().sin() * (720.0 / 2.0 - radius_2.get());
+        circle.set_transform(
+            (move || {
+                Transform::new(
+                    Vector2::new(circle_position_x() as f64, 720.0 / 2.0),
+                    0.0,
+                    1.0,
+                )
+            })
+            .into(),
+        );
+        circle
+    };
+
+    for i in 0..600 {
+        time.update(|t| *t += 0.02);
+        if i < 200 && radius.get() <= 50.0 {
+            radius.update(|r| *r += 1.0);
+        } else if i >= 550 && radius.get() > 0.0 {
+            println!("Reducing r from {r}", r = radius.get());
+            radius.update(|r| *r = 0.0f32.max(*r - 1.0));
+        }
+
+        save_frame(
+            [RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0)]
+                .into_iter()
+                .chain(circle.to_shapes_recursive().into_iter())
+                .collect(),
+        );
+    }
+}
+
+fn final_part(save_frame: &mut dyn FnMut(Vec<Shape>), colour: u32) {
     let time = Rc::new(Signal::new(0.0f32));
     let fast_time = {
         let time = Rc::clone(&time);
         Rc::new(move || time.get() * 3.0)
     };
-    let radius = 50.0;
+    let radius = Rc::new(Signal::new(0.0));
 
-    let circle_time = Rc::clone(&time);
-    let mut circle = CircleObject::new(
-        move || 720.0 / 2.0 + circle_time.get().sin() * (720.0 / 2.0 - radius),
-        || 720.0 / 2.0,
-        move || radius,
-        || 0xFFFFFFFF,
-    );
-    let fast_time_x = Rc::clone(&fast_time);
-    let fast_time_y = Rc::clone(&fast_time);
-    let mut other_circle = Rc::new(CircleObject::new(
-        move || fast_time_x().sin() * 80.0,
-        move || fast_time_y().cos() * 80.0,
-        move || radius / 2.0,
-        || 0xFF0000FF,
-    ));
+    let mut circle = {
+        let (radius_1, radius_2) = (Rc::clone(&radius), Rc::clone(&radius));
+        let mut circle = CircleObject::new(move || radius_1.get(), move || colour);
+        let circle_time = Rc::clone(&time);
+        let circle_position_x =
+            move || 720.0 / 2.0 + circle_time.get().sin() * (720.0 / 2.0 - radius_2.get());
+        circle.set_transform(
+            (move || {
+                Transform::new(
+                    Vector2::new(circle_position_x() as f64, 720.0 / 2.0),
+                    0.0,
+                    1.0,
+                )
+            })
+            .into(),
+        );
+        circle
+    };
+
+    let other_circle = {
+        let radius = Rc::clone(&radius);
+        let fast_time_x = Rc::clone(&fast_time);
+        let fast_time_y = Rc::clone(&fast_time);
+        let moon_x = move || fast_time_x().sin() * 80.0;
+        let moon_y = move || fast_time_y().cos() * 80.0;
+        let mut other_circle = CircleObject::new(move || radius.get() / 2.0, || 0xFF0000FF);
+        other_circle.set_transform(
+            (move || Transform::new(Vector2::new(moon_x() as f64, moon_y() as f64), 0.0, 1.0))
+                .into(),
+        );
+        Rc::new(other_circle)
+    };
     circle.set_children(DerivedSignal::new(move || {
         vec![Rc::clone(&other_circle) as Rc<dyn Object>]
     }));
 
-    for _ in 0..600 {
-        time.update(|t| *t += 0.1);
+    for i in 0..600 {
+        time.update(|t| *t += 0.02);
+        if i < 200 && radius.get() <= 50.0 {
+            radius.update(|r| *r += 1.0);
+        } else if i >= 550 && radius.get() > 0.0 {
+            println!("Reducing r from {r}", r = radius.get());
+            radius.update(|r| *r = 0.0f32.max(*r - 1.0));
+        }
 
         save_frame(
             [RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0)]
