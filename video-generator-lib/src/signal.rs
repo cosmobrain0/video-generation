@@ -58,13 +58,14 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct DerivedSignal<'a, T> {
-    computation: Box<dyn Fn() -> T + 'a>,
+    computation: Rc<dyn Fn() -> T + 'a>,
 }
 impl<'a, T> DerivedSignal<'a, T> {
     pub fn new(computation: impl Fn() -> T + 'a) -> Self {
         Self {
-            computation: Box::new(computation) as Box<dyn Fn() -> T + 'a>,
+            computation: Rc::new(computation) as Rc<dyn Fn() -> T + 'a>,
         }
     }
 
