@@ -8,140 +8,78 @@ use vector2::Vector2;
 use video_generator_lib::{node::*, shapes::*, signal::*};
 
 fn generate_frames(save_frame: &mut dyn FnMut(Vec<Shape>)) {
-    horizontal_circle(save_frame);
-    final_part(save_frame, 0xFFFFFFFF);
-    final_part(save_frame, 0);
+    final_part(save_frame);
 }
 
-fn horizontal_circle(save_frame: &mut dyn FnMut(Vec<Shape>)) {
-    let time = Rc::new(Signal::new(0.0f32));
-    let radius = Rc::new(Signal::new(0.0));
+fn final_part(save_frame: &mut dyn FnMut(Vec<Shape>)) {
+    let smoothstep = |x: f32| x * x * (3.0 - 2.0 * x);
+    let smoothstep_clamped = |x: f32| smoothstep(x.min(1.0).max(0.0));
 
-    let mut circle = {
-        let (radius_1, radius_2) = (Rc::clone(&radius), Rc::clone(&radius));
-        let mut circle = CircleObject::new(move || radius_1.get(), || 0xFFFFFFFF);
-        let circle_time = Rc::clone(&time);
-        let circle_position_x =
-            move || 720.0 / 2.0 + circle_time.get().sin() * (720.0 / 2.0 - radius_2.get());
-        circle.set_transform(
-            (move || {
+    let time = Signal::new(0.0f32);
+    let fast_time = || time.get() * 3.0;
+    let normalised_time = || time.get() / 12.0;
+    let start_end_ease = |x: f32, a: f32| smoothstep_clamped((0.5 - (x - 0.5).abs()) / a);
+
+    // FIXME: start_and_ease doesn't work
+    let radius = || start_end_ease(normalised_time(), 0.1) * 50.0;
+
+    let circle = CircleObject::new(
+        || radius(),
+        || 0xFFFFFFFF,
+        Some(
+            (|| {
                 Transform::new(
-                    Vector2::new(circle_position_x() as f64, 720.0 / 2.0),
+                    Vector2::new(
+                        (|| 720.0 / 2.0 + time.get().sin() * (720.0 / 2.0 - radius()))() as f64,
+                        720.0 / 2.0,
+                    ),
+                    0.0,
+                    2.0,
+                )
+            })
+            .into(),
+        ),
+        None,
+    );
+
+    let other_circle = CircleObject::new(
+        || radius() / 2.0,
+        || 0xFF0000FF,
+        Some(
+            (|| {
+                Transform::new(
+                    Vector2::new(
+                        (|| fast_time().sin() * 80.0)() as f64,
+                        (|| fast_time().cos() * 80.0)() as f64,
+                    ),
                     0.0,
                     1.0,
                 )
             })
             .into(),
-        );
-        circle
-    };
+        ),
+        Some(circle.global_transform()),
+    );
 
-    for i in 0..600 {
+    let third_circle = CircleObject::new(
+        || radius() / 4.0,
+        || 0xFF7FFF00,
+        Some((|| Transform::new(Vector2::new(20.0, 0.0), 0.0, 1.0)).into()),
+        Some(other_circle.global_transform()),
+    );
+
+    for _ in 0..600 {
         time.update(|t| *t += 0.02);
-        if i < 200 && radius.get() <= 50.0 {
-            radius.update(|r| *r += 1.0);
-        } else if i >= 550 && radius.get() > 0.0 {
-            println!("Reducing r from {r}", r = radius.get());
-            radius.update(|r| *r = 0.0f32.max(*r - 1.0));
-        }
 
         save_frame(
             [RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0)]
                 .into_iter()
-                .chain(circle.to_shapes_recursive().into_iter())
+                .chain(circle.to_shapes())
+                .chain(other_circle.to_shapes())
+                .chain(third_circle.to_shapes())
                 .collect(),
         );
     }
-}
-
-fn final_part(save_frame: &mut dyn FnMut(Vec<Shape>), colour: u32) {
-    let time = Rc::new(Signal::new(0.0f32));
-    let fast_time = {
-        let time = Rc::clone(&time);
-        Rc::new(move || time.get() * 3.0)
-    };
-    let radius = Rc::new(Signal::new(0.0));
-
-    let mut circle = {
-        let (radius_1, radius_2) = (Rc::clone(&radius), Rc::clone(&radius));
-        let mut circle = CircleObject::new(move || radius_1.get(), move || colour);
-        let circle_time = Rc::clone(&time);
-        let circle_position_x =
-            move || 720.0 / 2.0 + circle_time.get().sin() * (720.0 / 2.0 - radius_2.get());
-        circle.set_transform(
-            (move || {
-                Transform::new(
-                    Vector2::new(circle_position_x() as f64, 720.0 / 2.0),
-                    0.0,
-                    1.0,
-                )
-            })
-            .into(),
-        );
-        circle
-    };
-
-    let other_circle = {
-        let radius = Rc::clone(&radius);
-        let fast_time_x = Rc::clone(&fast_time);
-        let fast_time_y = Rc::clone(&fast_time);
-        let moon_x = move || fast_time_x().sin() * 80.0;
-        let moon_y = move || fast_time_y().cos() * 80.0;
-        let mut other_circle = CircleObject::new(move || radius.get() / 2.0, || 0xFF0000FF);
-        other_circle.set_transform(
-            (move || Transform::new(Vector2::new(moon_x() as f64, moon_y() as f64), 0.0, 1.0))
-                .into(),
-        );
-        Rc::new(other_circle)
-    };
-    circle.set_children(DerivedSignal::new(move || {
-        vec![Rc::clone(&other_circle) as Rc<dyn Object>]
-    }));
-
-    for i in 0..600 {
-        time.update(|t| *t += 0.02);
-        if i < 200 && radius.get() <= 50.0 {
-            radius.update(|r| *r += 1.0);
-        } else if i >= 550 && radius.get() > 0.0 {
-            println!("Reducing r from {r}", r = radius.get());
-            radius.update(|r| *r = 0.0f32.max(*r - 1.0));
-        }
-
-        save_frame(
-            [RectangleData::new_shape((0.0, 0.0), (720.0, 720.0), 0)]
-                .into_iter()
-                .chain(circle.to_shapes_recursive().into_iter())
-                .collect(),
-        );
-    }
-}
-
-fn physics_update<'a>(
-    mut centre: (f32, f32),
-    radius: f32,
-    mut velocity: (f32, f32),
-) -> ((f32, f32), f32, (f32, f32)) {
-    velocity.1 += 0.2;
-
-    centre.0 += velocity.0;
-    centre.1 += velocity.1;
-
-    if centre.1 + radius >= 720.0 {
-        centre.1 = 720.0 - radius;
-        velocity.1 = -velocity.1.abs();
-    }
-
-    if centre.0 + radius >= 720.0 {
-        centre.0 = 720.0 - radius;
-        velocity.0 = -velocity.0.abs();
-    }
-
-    if centre.0 - radius <= 0.0 {
-        centre.0 = radius;
-        velocity.0 = velocity.0.abs();
-    }
-
-    (centre, radius, velocity)
 }
 
 pub fn main() {

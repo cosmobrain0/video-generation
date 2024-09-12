@@ -8,16 +8,14 @@ macro_rules! declare_object {
     (pub struct $name:ident { $(pub $property:ident : $type:ty => $setter:ident $(,)?)+ } impl $_:ident { $to_shapes:item} ) => {
         pub struct $name<'a> {
             transform: DerivedSignal<'a, Transform>,
-            children: DerivedSignal<'a, Vec<Rc<dyn Object<'a>>>>,
-            parent: DerivedSignal<'a, Option<Rc<dyn Object<'a>>>>,
+            parent: DerivedSignal<'a, Transform>,
             $(pub $property: DerivedSignal<'a, $type>,)+
         }
         impl<'a> $name<'a> {
-            pub fn new($($property: impl Into<DerivedSignal<'a, $type>>,)+) -> Self {
+            pub fn new($($property: impl Into<DerivedSignal<'a, $type>>,)+ transform: Option<DerivedSignal<'a, Transform>>, parent: Option<DerivedSignal<'a, Transform>>) -> Self {
                 Self {
-                    transform: (|| Default::default()).into(),
-                    children: (|| Vec::new()).into(),
-                    parent: (|| None).into(),
+                    transform: transform.unwrap_or((|| Default::default()).into()),
+                    parent: parent.unwrap_or((|| Default::default()).into()),
                     $($property: $property.into(),)+
                 }
             }
@@ -36,19 +34,12 @@ macro_rules! declare_object {
             fn set_transform(&mut self, transform: DerivedSignal<'a, Transform>) {
                 self.transform = transform;
             }
-            fn children(&self) -> &DerivedSignal<'a, Vec<Rc<dyn Object<'a>>>> {
-                &self.children
-            }
 
-            fn set_children(&mut self, children: DerivedSignal<'a, Vec<Rc<dyn Object<'a>>>>) {
-                self.children = children;
-            }
-
-            fn parent(&self) -> DerivedSignal<'a, Option<Rc<dyn Object<'a>>>> {
+            fn parent(&self) -> DerivedSignal<'a, Transform> {
                 self.parent.clone()
             }
 
-            fn set_parent(&mut self, parent: DerivedSignal<'a, Option<Rc<dyn Object<'a>>>>) {
+            fn set_parent(&mut self, parent: DerivedSignal<'a, Transform>) {
                 self.parent = parent;
             }
 
@@ -64,7 +55,7 @@ declare_object! {
     }
     impl CircleObject {
         fn to_shapes(&self) -> Vec<Shape> {
-            let transform = self.transform.get();
+            let transform = self.global_transform().get();
             vec![
                 Shape::Circle(
                     CircleData::new(
